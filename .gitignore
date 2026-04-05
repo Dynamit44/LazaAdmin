@@ -92,3 +92,6 @@ userdata/
 
 # Git keep-outs
 .git-credentials
+
+git-push-laza.bat
+git-pull-laza.bat
