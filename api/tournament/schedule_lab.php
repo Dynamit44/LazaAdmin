@@ -3,7 +3,7 @@
 declare(strict_types=1);
 
 // /api/tournament/schedule_lab.php
-// Schedule Lab (песочница): строит сетку слотов по stage_days + пытается разложить реальные матчи из matches.
+// Schedule Lab: строит сетку слотов по stage_days + пытается разложить реальные матчи из matches.
 // Всегда возвращает JSON (даже при фаталах) — чтобы UI не видел "Bad JSON".
 
 ob_start();

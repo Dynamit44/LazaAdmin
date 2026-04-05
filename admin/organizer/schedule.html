@@ -2555,6 +2555,7 @@ if (oobCount){
     // 5) schedule_items -> assignments (обогащаем rich-данными)
     const assigns = [];
     const assigned = new Set();
+    const skippedSaved = [];
 
     for (const it of items){
       const mid = Number(it.match_id || 0);
@@ -2565,7 +2566,16 @@ if (oobCount){
 
       const map = daySlot[date] || null;
       const pos = map ? map[slotIndex] : null;
-      if (!pos || !pos.time) continue;
+      //if (!pos || !pos.time) continue;
+      if (!pos || !pos.time) {
+        skippedSaved.push({
+          match_id: mid,
+          date,
+          slot_index: slotIndex,
+          field_code: field
+        });
+        continue;
+      }
 
       const base = richById.get(mid) || matchesById.get(mid) || null;
       const nm = normalizeMatchForRender(mid, base);
@@ -2595,18 +2605,33 @@ if (oobCount){
     frame.meta = frame.meta || {};
     frame.meta.placed = assigns.length;
     frame.meta.saved = 1;
+frame.meta.saved_skipped = skippedSaved.length;
+frame.meta.saved_skipped_items = skippedSaved;
 
     lastJson = frame;
     window.lastJson = frame; // удобно для дебага (можно убрать)
 
     await ensureCoachPalette(stageId);
 
-    $('status').textContent = `загружено из БД (назначений: ${assigns.length})`;
-    clearDropMarks();
-    render(frame);
-    await applyConstraintHighlights();
-    await revalidateAllAssignments({ concurrency: 5, silent: true });
-    reapplyManualHighlights();
+    // $('status').textContent = `загружено из БД (назначений: ${assigns.length})`;
+    // clearDropMarks();
+    // render(frame);
+    // await applyConstraintHighlights();
+    // await revalidateAllAssignments({ concurrency: 5, silent: true });
+    // reapplyManualHighlights();
+
+$('status').textContent = `загружено из БД (назначений: ${assigns.length})`;
+clearDropMarks();
+render(frame);
+
+if (skippedSaved.length) {
+  notify(`Внимание: не удалось восстановить из БД ${skippedSaved.length} сохранённых матчей`, 'warning', 8000);
+  console.warn('Skipped saved assignments:', skippedSaved);
+}
+
+await applyConstraintHighlights();
+await revalidateAllAssignments({ concurrency: 5, silent: true });
+reapplyManualHighlights();
 
     // сводный нотис (один раз на состояние)
     noticeOnce(makeNoticeSig(frame), () => summarizeIssues(frame));

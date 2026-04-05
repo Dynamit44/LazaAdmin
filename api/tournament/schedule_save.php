@@ -27,12 +27,12 @@ if (!is_array($items) && is_array($assignments)) {
   $items = [];
   foreach ($assignments as $a) {
     if (!is_array($a)) continue;
-    $items[] = [
-      'day_date' => (string)($a['date'] ?? ''),
-      'slot_index' => (int)($a['slot_no'] ?? 0),
-      'resource_code' => (string)($a['field_code'] ?? ''),
-      'match_id' => (int)($a['match_id'] ?? 0),
-    ];
+$items[] = [
+  'day_date' => (string)($a['date'] ?? ''),
+  'slot_index' => (int)($a['slot_index'] ?? $a['slot_no'] ?? 0),
+  'resource_code' => (string)($a['field_code'] ?? ''),
+  'match_id' => (int)($a['match_id'] ?? 0),
+];
   }
 }
 
