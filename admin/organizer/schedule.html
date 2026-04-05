@@ -237,7 +237,7 @@
           </div>
         </div>
       </div>
-
+      <div id="dayJumpBar" class="uk-margin-small-bottom"></div>
       <div id="out"></div>
     </div>
   </div>
@@ -1522,12 +1522,44 @@
       <div class="uk-text-small">${esc(title)}</div>
       <div class="uk-text-meta">Откуда: ${esc(fromText)}</div>
       <div class="uk-margin-small-top">
+        <div class="uk-text-meta uk-margin-small-bottom">Клик по пустой ячейке — перенос, по занятой — swap</div>
         <button type="button" class="uk-button uk-button-danger uk-button-small" id="btnCancelClickMove">Отмена</button>
       </div>
     `;
 
     const btn = document.getElementById('btnCancelClickMove');
     if (btn) btn.onclick = () => clearSelectedManualMatch();
+  }
+
+  function renderDayJumpBar(days) {
+    const box = $('dayJumpBar');
+    if (!box) return;
+
+    const dates = [...new Set((days || []).map(d => String(d?.date || '')).filter(Boolean))];
+    if (!dates.length) {
+      box.innerHTML = '';
+      return;
+    }
+
+    box.innerHTML = `
+      <div class="uk-flex uk-flex-wrap uk-grid-small" uk-grid>
+        ${dates.map(d => `
+          <div>
+            <button type="button" class="uk-button uk-button-default uk-button-small" data-day-jump="${esc(d)}">${esc(d)}</button>
+          </div>
+        `).join('')}
+      </div>
+    `;
+
+    box.querySelectorAll('[data-day-jump]').forEach(btn => {
+      btn.onclick = () => {
+        const date = String(btn.dataset.dayJump || '');
+        const anchor = document.getElementById(`day-${date}`);
+        if (anchor) anchor.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      };
+    });
+
+    try { if (window.UIkit) UIkit.update(box); } catch(e) {}
   }
 
   function markSelectedManualMatch(mid){
@@ -2137,6 +2169,7 @@ function renderGlobalUnplaced(j){
   function render(j){
     const out = $('out');
     out.innerHTML = '';
+    const renderedDayAnchors = new Set();
 
     if (!j?.ok){
       out.innerHTML = `<div class="uk-alert-danger" uk-alert><p>${esc(j?.error || 'ошибка')}</p></div>`;
@@ -2316,6 +2349,11 @@ function renderGlobalUnplaced(j){
     for (const d of (j.days || [])){
       const card = document.createElement('div');
       card.className = 'uk-card uk-card-default uk-card-body uk-margin';
+      const dayAnchorId = `day-${String(d.date || '')}`;
+      if (String(d.date || '') && !renderedDayAnchors.has(dayAnchorId)) {
+        card.id = dayAnchorId;
+        renderedDayAnchors.add(dayAnchorId);
+      }
       const isReserved = (d.block === 'reserved');
       if (isReserved) card.classList.add('reserved-card');
 
@@ -2465,6 +2503,8 @@ if (oobCount){
       //card.appendChild(un);
       out.appendChild(card);
     }
+
+    renderDayJumpBar(j.days || []);
   }
 
   // ---------------------------------------------------------------------------
