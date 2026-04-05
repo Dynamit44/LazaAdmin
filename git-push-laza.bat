@@ -1,7 +1,8 @@
 @echo off
+chcp 1251 >nul
 cd /d G:\OSPanel\home\lazacup.local
 
-set /p msg=РљРѕРјРјРµРЅС‚Р°СЂРёР№ РєРѕРјРјРёС‚Р°:
+set /p msg=Комментарий коммита:
 
 git add -A
 git commit -m "%msg%"
