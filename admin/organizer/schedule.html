@@ -2957,38 +2957,39 @@ function cellTimeForDrop(td){
     $('out')?.addEventListener('click', async (e)=>{
       if (!manualMode || !clickMoveMode || dropInProgress || !lastJson?.ok) return;
 
+      const td = e.target.closest('td[data-date][data-slot-index][data-field]');
       const matchEl = e.target.closest('.match-draggable, .match');
-      if (matchEl && matchEl.dataset.mid) {
-        const mid = Number(matchEl.dataset.mid || 0);
-        if (!mid) return;
+      const clickedMid = Number(matchEl?.dataset.mid || 0);
 
-        if (selectedMatchId === mid) {
+      // Если матч уже выбран — следующий клик по ЛЮБОЙ ячейке = попытка переноса / swap.
+      // Исключение: повторный клик по той же самой карточке снимает выбор.
+      if (selectedMatchId && td) {
+        if (clickedMid && clickedMid === selectedMatchId) {
           clearSelectedManualMatch();
           return;
         }
+        await applyManualMoveOrSwap(selectedMatchId, selectedFromCell, td);
+        return;
+      }
 
-        const td = matchEl.closest('td[data-date][data-slot-index][data-field]');
-        selectedMatchId = mid;
-        selectedFromCell = td ? {
-          date: td.dataset.date,
-          slot_local: Number(td.dataset.slot || 0),
-          slot_index: Number(td.dataset.slotIndex || 0),
-          field_code: td.dataset.field,
-          time: normTime(cellTimeForDrop(td) || ''),
-          day_start: td.dataset.dayStart || '',
-          day_end: td.dataset.dayEnd || ''
+      // Если ещё ничего не выбрано — выбираем матч.
+      if (matchEl && clickedMid) {
+        const srcTd = matchEl.closest('td[data-date][data-slot-index][data-field]');
+        selectedMatchId = clickedMid;
+        selectedFromCell = srcTd ? {
+          date: srcTd.dataset.date,
+          slot_local: Number(srcTd.dataset.slot || 0),
+          slot_index: Number(srcTd.dataset.slotIndex || 0),
+          field_code: srcTd.dataset.field,
+          time: normTime(cellTimeForDrop(srcTd) || ''),
+          day_start: srcTd.dataset.dayStart || '',
+          day_end: srcTd.dataset.dayEnd || ''
         } : null;
 
         clearDropMarks();
         clearManualIssues();
-        markSelectedManualMatch(mid);
+        markSelectedManualMatch(clickedMid);
         renderSelectedMoveBar();
-        return;
-      }
-
-      const td = e.target.closest('td[data-date][data-slot-index][data-field]');
-      if (td && selectedMatchId) {
-        await applyManualMoveOrSwap(selectedMatchId, selectedFromCell, td);
       }
     });
 
