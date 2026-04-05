@@ -1,0 +1,38 @@
+# Архивы и бэкапы
+*.zip
+*.rar
+*.7z
+*.bak
+*.old
+backup*/
+backups*/
+
+# Дампы БД
+*.sql
+*.sql.gz
+
+# Логи и времянки
+*.log
+tmp/
+temp/
+cache/
+logs/
+
+# Секреты и окружение
+.env
+.env.*
+credentials.json
+secrets.json
+*.pem
+*.key
+id_rsa
+
+# IDE и системный мусор
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Если есть тяжёлые зависимости
+node_modules/
+vendor/

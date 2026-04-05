@@ -1,0 +1,119 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>LazaCup — Вход</title>
+
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/uikit@3.21.12/dist/css/uikit.min.css">
+  <script src="https://cdn.jsdelivr.net/npm/uikit@3.21.12/dist/js/uikit.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/uikit@3.21.12/dist/js/uikit-icons.min.js"></script>
+
+<script src="/admin/_admin.js?v=4" defer></script>
+<script>
+  document.addEventListener('DOMContentLoaded', () => {
+    Admin.initLoginPage();
+  });
+</script>
+
+
+  <style>
+    .logo {
+      width:44px;height:44px;border-radius:12px;
+      background:#0f172a;color:#fff;display:flex;align-items:center;justify-content:center;
+      font-weight:700;letter-spacing:.5px;
+    }
+  </style>
+</head>
+<body class="uk-background-muted">
+
+<div class="uk-container uk-container-small uk-margin-large-top">
+  <div class="uk-card uk-card-default uk-card-body uk-box-shadow-small">
+    <div class="uk-flex uk-flex-middle uk-grid-small" uk-grid>
+      <div><div class="logo">LC</div></div>
+      <div>
+        <div class="uk-text-lead uk-margin-remove">LazaCup Admin</div>
+        <div class="uk-text-small uk-text-muted">Вход в панель управления</div>
+      </div>
+    </div>
+
+    <hr class="uk-margin">
+
+    <div class="uk-margin">
+      <label class="uk-form-label">Логин</label>
+      <input id="login" class="uk-input" autocomplete="username">
+    </div>
+
+<div class="uk-margin">
+  <label class="uk-form-label">Пароль</label>
+
+  <div class="uk-inline uk-width-1-1">
+    <a class="uk-form-icon uk-form-icon-flip" href="#" id="togglePass" uk-icon="icon: eye"></a>
+    <input id="password" class="uk-input" type="password" autocomplete="current-password">
+  </div>
+</div>
+
+    <div class="uk-flex uk-flex-between uk-flex-middle uk-margin">
+      <div id="err" class="uk-text-danger uk-text-small"></div>
+      <button id="btnLogin" class="uk-button uk-button-primary" type="button">Войти</button>
+    </div>
+  </div>
+</div>
+
+<script>
+(function(){
+  var btn = document.getElementById('togglePass');
+  var inp = document.getElementById('password');
+  if(!btn || !inp) return;
+
+  btn.addEventListener('click', function(e){
+    e.preventDefault();
+    inp.type = (inp.type === 'password') ? 'text' : 'password';
+  });
+})();
+
+(async function(){
+  const err = document.getElementById('err');
+  const btn = document.getElementById('btn');
+
+  function setErr(s){ err.textContent = s || ''; }
+
+  // если уже залогинен — уходим в свою админку (или safe next)
+  try {
+    const user = await Admin.me();
+    if (user) {
+      const next = Admin.qs('next');
+      const target = (next && Admin.isSafeNext(next, user.role)) ? next : Admin.roleHome(user.role);
+      location.replace(target);
+      return;
+    }
+  } catch(e) {}
+
+  async function doLogin(){
+    setErr('');
+    btn.disabled = true;
+    try {
+      const login = document.getElementById('login').value.trim();
+      const password = document.getElementById('password').value;
+      if (!login || !password) { setErr('Укажи логин и пароль'); return; }
+
+      const user = await Admin.login(login, password);
+
+      const next = Admin.qs('next');
+      const target = (next && Admin.isSafeNext(next, user.role)) ? next : Admin.roleHome(user.role);
+      location.replace(target);
+
+    } catch(e) {
+      setErr(e.message || 'Ошибка входа');
+    } finally {
+      btn.disabled = false;
+    }
+  }
+
+  btn.addEventListener('click', doLogin);
+  document.getElementById('password').addEventListener('keydown', (e)=>{ if(e.key==='Enter') doLogin(); });
+})();
+</script>
+
+</body>
+</html>

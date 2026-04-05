@@ -1,0 +1,821 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>LazaCup — Группы</title>
+
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/uikit@3/dist/css/uikit.min.css">
+  <link rel="stylesheet" href="/admin/_admin.css?v=4">
+
+  <script src="https://cdn.jsdelivr.net/npm/uikit@3/dist/js/uikit.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/uikit@3/dist/js/uikit-icons.min.js"></script>
+
+   <script src="/admin/_admin.js?v=4" defer></script>
+   <script>
+     document.addEventListener('DOMContentLoaded', () => {
+       Admin.initAdminHeader('organizer');
+     });
+   </script>
+
+</head>
+<body>
+
+<!-- ADMIN HEADER (organizer) -->
+<header class="lc-admin-header uk-background-default uk-box-shadow-small" uk-sticky="show-on-up: true; animation: uk-animation-slide-top">
+  <div class="uk-container uk-container-large">
+    <nav class="uk-navbar-container uk-navbar-transparent" uk-navbar>
+      <div class="uk-navbar-left">
+        <a class="uk-navbar-item uk-logo lc-admin-logo" href="/admin/">
+          <span class="lc-badge">LC</span>
+          <span class="uk-margin-small-left">LazaCup <span class="uk-text-muted">Admin</span></span>
+        </a>
+
+        <ul class="uk-navbar-nav uk-visible@m" id="adminNav">
+          <li><a href="/admin/organizer/tournaments.html">Турниры</a></li>
+          <li><a href="/admin/organizer/stages.html">Этапы</a></li>
+          <li><a href="/admin/organizer/stage-categories.html">Категории</a></li>
+          <li><a href="/admin/organizer/field-rules.html">Поля</a></li>
+          <li><a href="/admin/organizer/squads-import.html">Команды</a></li>
+          <li><a class="uk-disabled" href="/admin/organizer/groups.html">Группы</a></li>
+          <li><a href="/admin/organizer/playoff.html">Плей-офф</a></li>
+          <li><a href="/admin/organizer/schedule.html">Расписание</a></li>
+        </ul>
+      </div>
+
+      <div class="uk-navbar-right">
+        <div class="uk-navbar-item uk-visible@m">
+          <span class="uk-text-small uk-text-muted">Вы:</span>
+          <span id="adminUser" class="uk-text-small uk-margin-small-left">—</span>
+        </div>
+
+        <div class="uk-navbar-item">
+          <button id="btnLogout" class="uk-button uk-button-default" type="button">
+            <span uk-icon="sign-out"></span> Выйти
+          </button>
+        </div>
+
+        <a class="uk-navbar-toggle uk-hidden@m" uk-toggle="target: #adminOffcanvas" href="#">
+          <span uk-navbar-toggle-icon></span>
+        </a>
+      </div>
+    </nav>
+  </div>
+</header>
+
+<div id="adminOffcanvas" uk-offcanvas="overlay: true">
+  <div class="uk-offcanvas-bar">
+    <button class="uk-offcanvas-close" type="button" uk-close></button>
+
+    <div class="uk-margin">
+      <div class="uk-text-small uk-text-muted">Вы:</div>
+      <div id="adminUserMobile">—</div>
+    </div>
+
+    <ul class="uk-nav uk-nav-default" id="adminNavMobile">
+      <li><a href="/admin/organizer/tournaments.html">Турниры</a></li>
+      <li><a href="/admin/organizer/stages.html">Этапы</a></li>
+      <li><a href="/admin/organizer/stage-categories.html">Категории</a></li>
+      <li><a href="/admin/organizer/field-rules.html">Поля</a></li>
+      <li><a href="/admin/organizer/squads-import.html">Команды</a></li>
+      <li><a class="uk-disabled" href="/admin/organizer/groups.html">Группы</a></li>
+      <li><a href="/admin/organizer/playoff.html">Плей-офф</a></li>
+      <li><a href="/admin/organizer/schedule.html">Расписание</a></li>
+      <li class="uk-nav-divider"></li>
+      <li><a href="#" id="btnLogoutMobile">Выйти</a></li>
+    </ul>
+  </div>
+</div>
+<!-- /ADMIN HEADER (organizer) -->
+
+<div class="uk-container uk-container-large uk-margin-large-top">
+
+  <div class="uk-card uk-card-default uk-card-body uk-margin">
+    <div class="uk-grid-small uk-flex-middle" uk-grid>
+      <div class="uk-width-expand@m">
+        <h3 class="uk-margin-remove">Группы (круговик)</h3>
+        <div class="uk-text-small uk-text-muted">Шаг 1: разбивка команд по группам. Расписание и матчи пока не создаём.</div>
+      </div>
+      <div class="uk-width-1-3@m">
+        <label class="uk-form-label">Этап</label>
+        <select id="stageSelect" class="uk-select"></select>
+      </div>
+    </div>
+
+    <div class="uk-margin-small-top uk-text-small" id="stageInfo"></div>
+  </div>
+
+  <div class="uk-card uk-card-default uk-card-body">
+    <div id="emptyBox" class="uk-text-muted">Выбери этап — и появятся категории.</div>
+
+    <div id="catsWrap" class="uk-hidden">
+      <ul id="catTabs" class="uk-tab" uk-tab></ul>
+      <ul id="catPanels" class="uk-switcher uk-margin"></ul>
+    </div>
+  </div>
+
+</div>
+
+<script>
+(function(){
+  const API_STAGES          = '/api/tournament/stages.php';
+  const API_STAGE_CATS      = '/api/tournament/stage_categories.php';
+  const API_SQUADS          = '/api/tournament/squads.php';
+  const API_GROUPS_PREVIEW  = '/api/tournament/groups_preview.php';
+  const API_GROUPS_APPLY    = '/api/tournament/groups_apply.php';
+  const API_PUBLIC_GROUPS   = '/api/tournament/public.php';
+
+  // ✅ NEW: matches actions
+  const API_MATCHES_BUILD   = '/api/tournament/matches_build.php';
+  const API_MATCHES_CLEAR   = '/api/tournament/matches_clear.php';
+
+  const el = (id) => document.getElementById(id);
+
+  const stageSelect = el('stageSelect');
+  const stageInfo   = el('stageInfo');
+  const emptyBox    = el('emptyBox');
+  const catsWrap    = el('catsWrap');
+  const catTabs     = el('catTabs');
+  const catPanels   = el('catPanels');
+
+  function notify(msg, status='primary') {
+    UIkit.notification({message: msg, status, pos:'top-right', timeout: 3000});
+  }
+
+  function redirect401(res) {
+    if (res.status === 401) {
+      location.href = '/admin/login.html?next=' + encodeURIComponent(location.pathname);
+      return true;
+    }
+    return false;
+  }
+
+  async function safeJson(res) {
+    const txt = await res.text();
+    let j = null;
+    try { j = JSON.parse(txt); } catch(e) {}
+
+    if (redirect401(res)) return null;
+
+    if (!res.ok) throw new Error(j?.error || txt.slice(0, 400) || ('HTTP ' + res.status));
+    if (!j || !j.ok) throw new Error(j?.error || 'bad json');
+    return j;
+  }
+
+  function fmtStage(s) {
+    const name = (s.name && String(s.name).trim()) ? String(s.name).trim() : ('Этап #' + s.id);
+    const cur = (Number(s.is_current) === 1) ? ' ★' : '';
+    return `[${s.tournament_id}] ${name} (${s.start_date} — ${s.end_date})${cur}`;
+  }
+
+  let STAGES = [];
+  let currentStageId = 0;
+
+  async function loadStages() {
+    const res = await fetch(API_STAGES, {credentials:'same-origin', cache:'no-store'});
+    const j = await safeJson(res);
+
+    STAGES = (j.stages || []).map(x => ({...x, id:Number(x.id), is_current:Number(x.is_current)}));
+
+    stageSelect.innerHTML = '';
+    STAGES.forEach(s => {
+      const opt = document.createElement('option');
+      opt.value = s.id;
+      opt.textContent = fmtStage(s);
+      stageSelect.appendChild(opt);
+    });
+
+    // default: current stage if exists
+    const cur = STAGES.find(x => x.is_current === 1);
+    currentStageId = cur ? cur.id : (STAGES[0] ? STAGES[0].id : 0);
+    if (currentStageId) stageSelect.value = String(currentStageId);
+  }
+
+  async function fetchStageCats(stageId) {
+    const res = await fetch(API_STAGE_CATS + '?stage_id=' + encodeURIComponent(stageId), {credentials:'same-origin', cache:'no-store'});
+    const j = await safeJson(res);
+    return j;
+  }
+
+  async function fetchSquads(stageId, category) {
+    const url = API_SQUADS + '?stage_id=' + encodeURIComponent(stageId) + '&category=' + encodeURIComponent(category);
+    const res = await fetch(url, {credentials:'same-origin', cache:'no-store'});
+    const j = await safeJson(res);
+    return (j.items || j.rows || []).map(r => ({
+      id: Number(r.id),
+      name: String(r.name || ''),
+      rating: Number(r.rating || 0),
+      variant: Number(r.category_variant || 1),
+    }));
+  }
+
+  async function fetchExistingGroups(stageId, category, variant) {
+    const url = API_PUBLIC_GROUPS
+      + '?type=groups'
+      + '&stage_id=' + encodeURIComponent(stageId)
+      + '&category=' + encodeURIComponent(category)
+      + '&variant=' + encodeURIComponent(variant);
+
+    const res = await fetch(url, {credentials:'same-origin', cache:'no-store'});
+    const j = await safeJson(res);
+    return j.groups || {};
+  }
+
+  // ✅ NEW: board (to check matches + played)
+  async function fetchBoard(stageId, category, variant) {
+    const url = API_PUBLIC_GROUPS
+      + '?type=board'
+      + '&stage_id=' + encodeURIComponent(stageId)
+      + '&category=' + encodeURIComponent(category)
+      + '&variant=' + encodeURIComponent(variant);
+
+    const res = await fetch(url, {credentials:'same-origin', cache:'no-store'});
+    const j = await safeJson(res);
+    return j;
+  }
+
+  function computeMaxGroups(n) {
+    const byMin = Math.floor(n / 3); // min group size 3
+    return Math.min(4, Math.max(1, byMin));
+  }
+
+  function renderTeamsList(teams) {
+    if (!teams.length) return '<div class="uk-text-muted">Команд нет.</div>';
+    return '<ol class="uk-list uk-list-decimal uk-margin-small-top">'
+      + teams.map(t => `<li><span class="uk-text-bold">${escapeHtml(t.name)}</span> <span class="uk-text-muted">(rating ${t.rating})</span></li>`).join('')
+      + '</ol>';
+  }
+
+  function escapeHtml(s){
+    return String(s || '').replace(/[&<>"]/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[ch]));
+  }
+
+  function normalizeGroupsMap(g) {
+    if (Array.isArray(g)) {
+      const m = {};
+      for (const gr of g) {
+        if (!gr || typeof gr !== 'object') continue;
+        const code = String(gr.code || '');
+        if (!code) continue;
+        m[code] = Array.isArray(gr.squads) ? gr.squads : [];
+      }
+      return m;
+    }
+    return (g && typeof g === 'object') ? g : {};
+  }
+
+  function renderGroups(groupsAny) {
+    const groupsMap = normalizeGroupsMap(groupsAny);
+
+    const codes = Object.keys(groupsMap).sort();
+    if (!codes.length) return '<div class="uk-text-muted">Нет групп.</div>';
+
+    let html = '<div class="uk-grid uk-grid-small" uk-grid>';
+    for (const code of codes) {
+      const list = Array.isArray(groupsMap[code]) ? groupsMap[code] : [];
+      html += `
+        <div class="uk-width-1-2@m uk-width-1-1">
+          <div class="uk-card uk-card-default uk-card-body uk-card-small">
+            <div class="uk-text-bold uk-margin-small-bottom">Группа ${escapeHtml(code)} <span class="uk-text-muted">(${list.length})</span></div>
+            <ol class="uk-margin-remove">
+              ${list.map(x => `<li>${escapeHtml(x.name || '')}${x.rating ? ` <span class="uk-text-muted">(${x.rating})</span>` : ''}</li>`).join('')}
+            </ol>
+          </div>
+        </div>
+      `;
+    }
+    html += '</div>';
+    return html;
+  }
+
+  function buildVariantButtons(container, variants, onPick) {
+    container.innerHTML = '';
+
+    const nav = document.createElement('ul');
+    nav.className = 'uk-subnav uk-subnav-pill uk-margin-small-bottom';
+
+    variants.forEach(v => {
+      const li = document.createElement('li');
+      const a = document.createElement('a');
+      a.href = '#';
+      a.textContent = 'Вариант ' + v;
+      a.addEventListener('click', (e) => {
+        e.preventDefault();
+        nav.querySelectorAll('li').forEach(x => x.classList.remove('uk-active'));
+        li.classList.add('uk-active');
+        onPick(v);
+      });
+      li.appendChild(a);
+      nav.appendChild(li);
+    });
+
+    container.appendChild(nav);
+
+    // activate first
+    if (variants.length) {
+      nav.querySelector('li')?.classList.add('uk-active');
+      onPick(variants[0]);
+    }
+  }
+
+  async function renderCategoryPanel(panelEl, stageId, category, matchMinutesInfo) {
+    panelEl.innerHTML = '<div class="uk-text-muted">Загрузка…</div>';
+
+    const squads = await fetchSquads(stageId, category);
+    const variants = Array.from(new Set(squads.map(x => x.variant))).sort((a,b)=>a-b);
+
+    const wrap = document.createElement('div');
+
+    const header = document.createElement('div');
+    header.className = 'uk-flex uk-flex-between uk-flex-middle uk-margin-small-bottom';
+    header.innerHTML = `
+      <div>
+        <div class="uk-text-bold">Категория ${escapeHtml(category)}</div>
+        <div class="uk-text-small uk-text-muted">Матч: ${escapeHtml(matchMinutesInfo || '—')}</div>
+      </div>
+      <div class="uk-text-small uk-text-muted">Минимальный размер группы: 3</div>
+    `;
+    wrap.appendChild(header);
+
+    const variantWrap = document.createElement('div');
+    wrap.appendChild(variantWrap);
+
+    const body = document.createElement('div');
+    wrap.appendChild(body);
+
+    async function showVariant(variant) {
+      const teams = squads.filter(x => x.variant === variant);
+      const n = teams.length;
+      const maxGroups = computeMaxGroups(n);
+
+      let existingCount = 0;
+      let existingGroupsMap = {}; // ✅ NEW: keep groups for checks
+
+      body.innerHTML = '';
+
+      const info = document.createElement('div');
+      info.className = 'uk-alert uk-alert-default uk-padding-small';
+      info.style.marginBottom = '10px';
+      info.innerHTML = `
+        <div><span class="uk-text-bold">Команд:</span> ${n}</div>
+        <div class="uk-text-small uk-text-muted">Вариант: ${variant}</div>
+      `;
+      body.appendChild(info);
+
+      // existing groups
+      const existingBox = document.createElement('div');
+      existingBox.className = 'uk-margin-small-top';
+      existingBox.innerHTML = '<div class="uk-text-small uk-text-muted">Текущие группы (из БД):</div><div>Загрузка…</div>';
+      body.appendChild(existingBox);
+
+      // controls
+      const controls = document.createElement('div');
+      controls.className = 'uk-card uk-card-default uk-card-body uk-padding-small uk-margin-small-top';
+      body.appendChild(controls);
+
+      const previewBox = document.createElement('div');
+      previewBox.className = 'uk-margin-small-top';
+      body.appendChild(previewBox);
+
+      let selectedGroupCount = 0;
+
+      if (n < 3) {
+        controls.innerHTML = '<div class="uk-text-danger uk-text-bold">Нужно минимум 3 команды, иначе круговик невозможен.</div>';
+      } else if (n <= 5) {
+        controls.innerHTML = '<div class="uk-text-bold">Авто-режим:</div><div class="uk-text-small uk-text-muted">Команд ≤ 5 → 1 группа, круговик.</div>';
+        selectedGroupCount = 1;
+      } else {
+        const hint = document.createElement('div');
+        hint.className = 'uk-text-small uk-text-muted uk-margin-small-bottom';
+        hint.textContent = 'Выбери количество групп (1–4). Ограничение: в каждой группе минимум 3 команды.';
+        controls.appendChild(hint);
+
+        const btns = document.createElement('div');
+        btns.className = 'uk-button-group';
+
+        for (let g=1; g<=4; g++) {
+          const b = document.createElement('button');
+          b.type = 'button';
+          b.className = 'uk-button uk-button-default';
+          b.textContent = String(g);
+
+          const allowed = (g <= maxGroups);
+          if (!allowed) {
+            b.disabled = true;
+            b.title = `Нельзя: при ${n} командах и мин. размере 3 максимум ${maxGroups} групп(ы)`;
+          }
+
+          b.addEventListener('click', () => {
+            btns.querySelectorAll('button').forEach(x => x.classList.remove('uk-button-primary'));
+            b.classList.add('uk-button-primary');
+            selectedGroupCount = g;
+            previewBox.innerHTML = '';
+          });
+
+          btns.appendChild(b);
+        }
+
+        controls.appendChild(btns);
+
+        const note = document.createElement('div');
+        note.className = 'uk-text-small uk-text-muted uk-margin-small-top';
+        note.innerHTML = 'Подсказка: если команд нечётно/не делится ровно — группы будут разного размера (например 7 команд и 2 группы → 3+4).';
+        controls.appendChild(note);
+      }
+
+      // buttons
+      const actions = document.createElement('div');
+      actions.className = 'uk-margin-small-top uk-flex uk-flex-middle uk-grid-small';
+      actions.setAttribute('uk-grid','');
+      actions.innerHTML = `
+        <div class="uk-width-auto">
+          <button class="uk-button uk-button-default" type="button" id="btnPreview">Предпросмотр</button>
+        </div>
+        <div class="uk-width-auto">
+          <button class="uk-button uk-button-primary" type="button" id="btnApply" disabled>Сохранить группы</button>
+        </div>
+        <div class="uk-width-expand uk-text-small uk-text-muted" id="previewMeta"></div>
+      `;
+      body.appendChild(actions);
+
+      const btnPreview = actions.querySelector('#btnPreview');
+      const btnApply   = actions.querySelector('#btnApply');
+      const previewMeta = actions.querySelector('#previewMeta');
+
+      let lastPreview = null;
+
+      async function loadExisting() {
+        try {
+          const g = await fetchExistingGroups(stageId, category, variant);
+          existingGroupsMap = normalizeGroupsMap(g);
+          existingCount = Object.values(existingGroupsMap).reduce((acc, arr) => acc + (Array.isArray(arr) ? arr.length : 0), 0);
+          existingBox.querySelector('div:last-child').innerHTML = renderGroups(existingGroupsMap);
+        } catch (e) {
+          existingGroupsMap = {};
+          existingCount = 0;
+          existingBox.querySelector('div:last-child').innerHTML = '<div class="uk-text-danger">' + escapeHtml(e.message) + '</div>';
+        }
+      }
+
+      function groupsOkForMatches(map) {
+        const m = map || {};
+        const codes = Object.keys(m);
+        if (!codes.length) return false;
+        for (const c of codes) {
+          const list = m[c];
+          if (!Array.isArray(list) || list.length < 3) return false;
+        }
+        return true;
+      }
+
+      await loadExisting();
+
+      // ✅ NEW: Matches UI (build/clear) right after existing groups
+      const matchBox = document.createElement('div');
+      matchBox.className = 'uk-card uk-card-default uk-card-body uk-padding-small uk-margin-small-top';
+      matchBox.innerHTML = `
+        <div class="uk-text-bold">Матчи (круговик)</div>
+        <div class="uk-text-small uk-text-muted">Шаг 2: создаём пары матчей по сохранённым группам. Расписание будет позже.</div>
+
+        <div class="uk-margin-small-top uk-grid-small uk-flex-middle" uk-grid>
+          <div class="uk-width-auto">
+            <button class="uk-button uk-button-primary" type="button" id="btnBuildMatches">Сформировать матчи</button>
+          </div>
+          <div class="uk-width-auto">
+            <button class="uk-button uk-button-danger" type="button" id="btnClearMatches">Очистить матчи</button>
+          </div>
+          <div class="uk-width-expand uk-text-small uk-text-muted" id="matchesMeta">—</div>
+        </div>
+
+        <div class="uk-text-small uk-text-muted uk-margin-small-top" id="matchesHint"></div>
+      `;
+      body.appendChild(matchBox);
+
+      const btnBuildMatches = matchBox.querySelector('#btnBuildMatches');
+      const btnClearMatches = matchBox.querySelector('#btnClearMatches');
+      const matchesMeta     = matchBox.querySelector('#matchesMeta');
+      const matchesHint     = matchBox.querySelector('#matchesHint');
+
+      async function refreshMatchesInfo() {
+        btnBuildMatches.disabled = true;
+        btnClearMatches.disabled = true;
+        matchesMeta.textContent = 'Проверяю…';
+        matchesHint.textContent = '';
+
+        try {
+          const b = await fetchBoard(stageId, category, variant);
+          const matches = Array.isArray(b.matches) ? b.matches : [];
+          const total = matches.length;
+          const played = matches.filter(m => m.home_goals !== null && m.away_goals !== null).length;
+
+          if (total === 0) {
+            matchesMeta.textContent = 'Матчи ещё не созданы.';
+            const ok = (n >= 3) && groupsOkForMatches(existingGroupsMap);
+            btnBuildMatches.disabled = !ok;
+            btnClearMatches.disabled = true;
+            if (!ok) matchesHint.textContent = 'Нужно сохранить корректные группы (в каждой минимум 3 команды).';
+            return;
+          }
+
+          matchesMeta.textContent = `Матчей: ${total} • сыграно: ${played}`;
+          btnBuildMatches.disabled = true;
+          btnClearMatches.disabled = false;
+          if (played > 0) matchesHint.textContent = 'Внимание: очистка удалит результаты сыгранных матчей.';
+        } catch (e) {
+          matchesMeta.textContent = 'Ошибка проверки матчей';
+          matchesHint.textContent = e.message || String(e);
+          // если board не реализован — хотя бы дадим возможность build при валидных группах
+          const ok = (n >= 3) && groupsOkForMatches(existingGroupsMap);
+          btnBuildMatches.disabled = !ok;
+          btnClearMatches.disabled = true;
+        }
+      }
+
+      await refreshMatchesInfo();
+
+      btnBuildMatches.addEventListener('click', async () => {
+        try {
+          if (!groupsOkForMatches(existingGroupsMap)) {
+            notify('Группы не сохранены или в какой-то группе меньше 3 команд', 'warning');
+            return;
+          }
+
+          if (!confirm('Сформировать матчи по сохранённым группам?')) return;
+
+          btnBuildMatches.disabled = true;
+          matchesMeta.textContent = 'Создаю…';
+
+          const res = await fetch(API_MATCHES_BUILD, {
+            method:'POST',
+            credentials:'same-origin',
+            headers:{'Content-Type':'application/json'},
+            body: JSON.stringify({ stage_id: stageId, category: category, variant: variant })
+          });
+          const j = await safeJson(res);
+
+          // j.matches или j.matches_total — не гадаем, покажем что есть
+          notify('Матчи созданы', 'success');
+          await refreshMatchesInfo();
+        } catch (e) {
+          notify(e.message || 'Ошибка создания матчей', 'danger');
+          await refreshMatchesInfo();
+        }
+      });
+
+      btnClearMatches.addEventListener('click', async () => {
+        try {
+          if (!confirm('Очистить матчи? Будут удалены матчи, результаты и расписание (если уже есть).')) return;
+
+          btnClearMatches.disabled = true;
+          matchesMeta.textContent = 'Удаляю…';
+
+          const res = await fetch(API_MATCHES_CLEAR, {
+            method:'POST',
+            credentials:'same-origin',
+            headers:{'Content-Type':'application/json'},
+            body: JSON.stringify({ stage_id: stageId, category: category, variant: variant })
+          });
+          const j = await safeJson(res);
+
+          notify('Очищено', 'success');
+          await refreshMatchesInfo();
+        } catch (e) {
+          notify(e.message || 'Ошибка очистки матчей', 'danger');
+          await refreshMatchesInfo();
+        }
+      });
+
+      btnPreview.addEventListener('click', async () => {
+        try {
+          if (n > 5 && !selectedGroupCount) {
+            notify('Выбери количество групп', 'warning');
+            return;
+          }
+
+          btnPreview.disabled = true;
+          btnApply.disabled = true;
+          previewMeta.textContent = 'Считаю…';
+
+          const res = await fetch(API_GROUPS_PREVIEW, {
+            method:'POST',
+            credentials:'same-origin',
+            headers:{'Content-Type':'application/json'},
+            body: JSON.stringify({
+              stage_id: stageId,
+              category: category,
+              variant: variant,
+              group_count: (n <= 5) ? 1 : selectedGroupCount
+            })
+          });
+          const j = await safeJson(res);
+
+          lastPreview = j;
+
+          const w = (j.warnings || []);
+          const warningsHtml = w.length
+            ? '<div class="uk-alert uk-alert-warning uk-padding-small">' + w.map(x => '<div>• ' + escapeHtml(x) + '</div>').join('') + '</div>'
+            : '';
+
+          previewBox.innerHTML = `
+            <div class="uk-text-small uk-text-muted">Предпросмотр (ещё не сохранено):</div>
+            ${warningsHtml}
+            ${renderGroups(j.groups)}
+          `;
+
+          const meta = j.meta || {};
+          previewMeta.textContent = `Групп: ${meta.group_count} • Команд: ${meta.teams} • Матчей: ${meta.total_matches}`;
+
+          btnApply.disabled = false;
+
+          if (meta.group_count === 1 && meta.teams > 5) {
+            notify('Внимание: 1 группа при большом количестве команд = очень много матчей. Проверь предупреждения.', 'warning');
+          }
+
+        } catch (e) {
+          notify(e.message || 'Ошибка предпросмотра', 'danger');
+          previewMeta.textContent = '';
+        } finally {
+          btnPreview.disabled = false;
+        }
+      });
+
+      btnApply.addEventListener('click', async () => {
+        if (!lastPreview) {
+          notify('Сначала сделай предпросмотр', 'warning');
+          return;
+        }
+
+        // ✅ предупреждение о перезаписи
+        if (existingCount > 0) {
+          const ok = confirm('Группы уже сохранены. Перезаписать текущие группы?');
+          if (!ok) return;
+        }
+
+        try {
+          btnApply.disabled = true;
+
+          const meta = lastPreview.meta || {};
+
+          const res = await fetch(API_GROUPS_APPLY, {
+            method:'POST',
+            credentials:'same-origin',
+            headers:{'Content-Type':'application/json'},
+            body: JSON.stringify({
+              stage_id: stageId,
+              category: category,
+              variant: variant,
+              group_count: meta.group_count
+            })
+          });
+          const j = await safeJson(res);
+
+          notify('Группы сохранены', 'success');
+          lastPreview = null;
+          previewBox.innerHTML = '';
+          previewMeta.textContent = '';
+
+          await loadExisting();
+          await refreshMatchesInfo(); // ✅ NEW: after save groups, update matches state
+
+        } catch (e) {
+          notify(e.message || 'Ошибка сохранения', 'danger');
+        } finally {
+          btnApply.disabled = false;
+        }
+      });
+
+      // small helper: teams list (collapsed)
+      const teamsBox = document.createElement('div');
+      teamsBox.className = 'uk-margin-small-top';
+      teamsBox.innerHTML = `
+        <details class="uk-margin-small-top">
+          <summary class="uk-text-small">Показать список команд (rating)</summary>
+          ${renderTeamsList(teams)}
+        </details>
+      `;
+      body.appendChild(teamsBox);
+    }
+
+    if (!variants.length) {
+      variantWrap.innerHTML = '<div class="uk-text-muted">Нет команд в этой категории.</div>';
+      panelEl.innerHTML = '';
+      panelEl.appendChild(wrap);
+      return;
+    }
+
+    buildVariantButtons(variantWrap, variants, showVariant);
+
+    panelEl.innerHTML = '';
+    panelEl.appendChild(wrap);
+  }
+
+  async function renderForStage(stageId) {
+    const s = STAGES.find(x => Number(x.id) === Number(stageId));
+    stageInfo.innerHTML = s
+      ? `<span class="uk-text-muted">Текущий этап:</span> <span class="uk-text-bold">${escapeHtml(s.name || ('Этап #' + s.id))}</span> <span class="uk-text-muted">(${escapeHtml(s.start_date)} — ${escapeHtml(s.end_date)})</span>`
+      : '';
+
+    catTabs.innerHTML = '';
+    catPanels.innerHTML = '';
+
+    const j = await fetchStageCats(stageId);
+    const rows = j.rows || [];
+
+    if (!rows.length) {
+      emptyBox.textContent = 'В этом этапе ещё не заданы категории (stage-categories).';
+      emptyBox.classList.remove('uk-hidden');
+      catsWrap.classList.add('uk-hidden');
+      return;
+    }
+
+    emptyBox.classList.add('uk-hidden');
+    catsWrap.classList.remove('uk-hidden');
+
+    rows.forEach((r, idx) => {
+      const cat = String(r.category);
+      const mm = (r.match_minutes !== null && r.match_minutes !== undefined && r.match_minutes !== '')
+        ? (r.match_minutes + ' мин')
+        : 'из этапа';
+
+      const li = document.createElement('li');
+      li.innerHTML = `<a href="#">${escapeHtml(cat)}</a>`;
+      catTabs.appendChild(li);
+
+      const panel = document.createElement('li');
+      panel.innerHTML = '<div class="uk-text-muted">…</div>';
+      catPanels.appendChild(panel);
+
+      panel.dataset.cat = cat;
+      panel.dataset.mm = mm;
+    });
+
+    UIkit.switcher(catTabs);
+
+    async function renderPanelByIndex(i) {
+      const panel = catPanels.children[i];
+      if (!panel) return;
+      if (panel.dataset.rendered === '1') return;
+
+      panel.innerHTML = '<div class="uk-text-muted">Загрузка…</div>';
+
+      try {
+        await renderCategoryPanel(panel, stageId, panel.dataset.cat, panel.dataset.mm);
+        panel.dataset.rendered = '1';
+      } catch (err) {
+        panel.dataset.rendered = '0';
+        panel.innerHTML = `
+          <div class="uk-alert uk-alert-danger uk-padding-small">
+            Ошибка: ${escapeHtml(err && err.message ? err.message : String(err))}
+            <div class="uk-margin-small-top">
+              <button class="uk-button uk-button-default uk-button-small" type="button" id="btnRetry">Повторить</button>
+            </div>
+          </div>
+        `;
+        panel.querySelector('#btnRetry')?.addEventListener('click', () => {
+          renderPanelByIndex(i).catch(e => notify(e.message || 'Ошибка','danger'));
+        });
+        throw err;
+      }
+    }
+
+    await renderPanelByIndex(0);
+
+    catTabs.addEventListener('click', (e) => {
+      const a = e.target.closest('a');
+      if (!a) return;
+
+      const li = a.closest('li');
+      if (!li || li.parentNode !== catTabs) return;
+
+      const idx = Array.prototype.indexOf.call(catTabs.children, li);
+      if (idx < 0) return;
+
+      requestAnimationFrame(() => {
+        renderPanelByIndex(idx).catch(err => notify(err.message || 'Ошибка', 'danger'));
+      });
+    });
+  }
+
+  stageSelect.addEventListener('change', () => {
+    const sid = Number(stageSelect.value);
+    if (!sid) return;
+    renderForStage(sid).catch(e => notify(e.message,'danger'));
+  });
+
+  (async () => {
+    try {
+      await loadStages();
+      if (currentStageId) {
+        await renderForStage(currentStageId);
+      }
+    } catch (e) {
+      notify(e.message || 'Ошибка', 'danger');
+    }
+  })();
+
+})();
+
+</script>
+
+</body>
+</html>

@@ -1,0 +1,318 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>LazaCup — Диагностика</title>
+
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/uikit@3/dist/css/uikit.min.css">
+  <link rel="stylesheet" href="/admin/_admin.css?v=4">
+
+  <script src="https://cdn.jsdelivr.net/npm/uikit@3/dist/js/uikit.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/uikit@3/dist/js/uikit-icons.min.js"></script>
+</head>
+<body>
+
+<header class="uk-navbar-container uk-navbar-transparent" uk-navbar>
+  <div class="uk-navbar-left uk-padding-small">
+    <div class="uk-flex uk-flex-middle uk-grid-small" uk-grid>
+      <div><div class="logo">LC</div></div>
+      <div>
+        <div class="uk-text-bold">LazaCup Admin</div>
+        <div class="uk-text-small uk-text-muted">Диагностика</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="uk-navbar-right uk-padding-small">
+    <div class="uk-flex uk-flex-middle uk-grid-small" uk-grid>
+      <div class="uk-text-small uk-text-muted uk-margin-right" id="who"></div>
+      <a href="/admin/organizer/" class="uk-button uk-button-default" type="button">
+        <span uk-icon="arrow-left"></span> Назад
+      </a>
+      <button id="btnLogout" class="uk-button uk-button-default" type="button">
+        <span uk-icon="sign-out"></span> Выйти
+      </button>
+    </div>
+  </div>
+</header>
+
+<div class="uk-container uk-container-large uk-margin-large-top">
+
+  <div class="uk-card uk-card-default uk-card-body uk-box-shadow-small">
+    <div class="uk-flex uk-flex-between uk-flex-middle uk-flex-wrap">
+      <div>
+        <h3 class="uk-margin-remove-top">Контроль системы</h3>
+        <div class="uk-text-small uk-text-muted">Проверка целостности расписания и связанных данных</div>
+      </div>
+      <div class="uk-text-meta" id="diagCurrentLine">Текущий этап: —</div>
+    </div>
+
+    <hr>
+
+    <div class="uk-grid-small" uk-grid>
+      <div class="uk-width-1-2@m">
+        <label class="uk-form-label">Турнир</label>
+        <div class="uk-form-controls">
+          <select id="diagTournament" class="uk-select"></select>
+        </div>
+      </div>
+
+      <div class="uk-width-1-2@m">
+        <label class="uk-form-label">Этап</label>
+        <div class="uk-form-controls">
+          <select id="diagStage" class="uk-select"></select>
+        </div>
+      </div>
+
+      <div class="uk-width-1-1">
+        <div class="uk-flex uk-flex-wrap uk-grid-small" uk-grid>
+          <div>
+            <button id="btnDiagCheck" class="uk-button uk-button-primary" type="button">
+              <span uk-icon="search"></span> Проверка целостности
+            </button>
+          </div>
+          <div>
+            <button id="btnDiagRefresh" class="uk-button uk-button-default" type="button">
+              <span uk-icon="refresh"></span> Обновить список
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="diagSummaryWrap" class="uk-card uk-card-default uk-card-body uk-box-shadow-small uk-margin-top uk-hidden">
+    <h3 class="uk-margin-remove-top">Сводка</h3>
+    <div id="diagSummary"></div>
+  </div>
+
+  <div id="diagDetailsWrap" class="uk-card uk-card-default uk-card-body uk-box-shadow-small uk-margin-top uk-hidden">
+    <h3 class="uk-margin-remove-top">Детали</h3>
+    <div id="diagDetails"></div>
+  </div>
+
+</div>
+
+<script src="/admin/_admin.js?v=4"></script>
+<script>
+  Admin.initAdminHeader('organizer');
+
+  const API_TOURNAMENTS = '/api/tournament/tournaments.php';
+  const API_STAGES      = '/api/tournament/stages.php';
+  const API_CURRENT     = '/api/tournament/current.php';
+  const API_DIAG        = '/api/tournament/schedule_integrity_check.php';
+
+  function notify(msg, status='primary') {
+    UIkit.notification({message: msg, status, pos:'top-right', timeout: 2500});
+  }
+
+  async function apiGet(url) {
+    const r = await fetch(url, {credentials:'same-origin', cache:'no-store'});
+    if (r.status === 401) { location.href = '/admin/login.html'; return null; }
+    const j = await r.json().catch(() => null);
+    if (!j || j.ok !== true) throw new Error((j && j.error) ? j.error : 'API error');
+    return j;
+  }
+
+  function esc(s) {
+    return String(s == null ? '' : s)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;');
+  }
+
+  function setOptions(select, items, getValue, getLabel, currentValue) {
+    select.innerHTML = '';
+    (items || []).forEach(item => {
+      const opt = document.createElement('option');
+      opt.value = String(getValue(item));
+      opt.textContent = getLabel(item);
+      if (String(currentValue || '') === opt.value) opt.selected = true;
+      select.appendChild(opt);
+    });
+  }
+
+  async function loadTournaments(currentTournamentId) {
+    const j = await apiGet(API_TOURNAMENTS);
+    const items = j.tournaments || [];
+    const sel = document.getElementById('diagTournament');
+    setOptions(sel, items, x => x.id, x => x.name + ' #' + x.id, currentTournamentId || (items[0] && items[0].id));
+    return items;
+  }
+
+  async function loadStages(tournamentId, currentStageId) {
+    const j = await apiGet(API_STAGES + '?tournament_id=' + encodeURIComponent(tournamentId));
+    const items = j.stages || [];
+    const sel = document.getElementById('diagStage');
+    setOptions(sel, items, x => x.id, x => x.name + ' (' + x.start_date + ' → ' + x.end_date + ')', currentStageId || (items[0] && items[0].id));
+    return items;
+  }
+
+  function summaryHtml(summary, totalProblems) {
+    const rows = [
+      ['Дубли слотов', summary.slot_duplicates || 0],
+      ['Дубли match_id', summary.match_duplicates || 0],
+      ['Висячие schedule_items', summary.schedule_items_orphans || 0],
+      ['Висячие schedule', summary.schedule_orphans || 0],
+      ['Висячие results', summary.results_orphans || 0],
+      ['Конфликты команд', summary.team_conflicts || 0],
+      ['Конфликты тренеров', summary.coach_conflicts || 0],
+    ];
+
+    const badgeClass = totalProblems ? 'uk-label uk-label-danger' : 'uk-label uk-label-success';
+    const badgeText  = totalProblems ? ('Найдены проблемы: ' + totalProblems) : 'Проблем не найдено';
+
+    return `
+      <div class="uk-margin-small-bottom">
+        <span class="${badgeClass}">${badgeText}</span>
+      </div>
+      <table class="uk-table uk-table-small uk-table-divider uk-table-middle">
+        <thead>
+          <tr>
+            <th>Проверка</th>
+            <th class="uk-text-right">Количество</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${rows.map(row => `
+            <tr>
+              <td>${esc(row[0])}</td>
+              <td class="uk-text-right"><b>${esc(row[1])}</b></td>
+            </tr>
+          `).join('')}
+        </tbody>
+      </table>
+    `;
+  }
+
+  function rowsTable(title, rows) {
+    if (!rows || !rows.length) return '';
+    const keys = Object.keys(rows[0] || {});
+    return `
+      <div class="uk-margin-medium-top">
+        <h4 class="uk-margin-small-bottom">${esc(title)}</h4>
+        <div class="uk-overflow-auto">
+          <table class="uk-table uk-table-small uk-table-divider uk-table-striped uk-table-middle">
+            <thead>
+              <tr>${keys.map(k => `<th>${esc(k)}</th>`).join('')}</tr>
+            </thead>
+            <tbody>
+              ${rows.map(row => `
+                <tr>${keys.map(k => `<td>${esc(row[k])}</td>`).join('')}</tr>
+              `).join('')}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    `;
+  }
+
+  function detailsHtml(report) {
+    let html = '';
+    html += rowsTable('Дубли слотов', report.slot_duplicates || []);
+    html += rowsTable('Дубли match_id', report.match_duplicates || []);
+    html += rowsTable('Висячие schedule_items', report.schedule_items_orphans || []);
+    html += rowsTable('Висячие schedule', report.schedule_orphans || []);
+    html += rowsTable('Висячие results', report.results_orphans || []);
+    html += rowsTable('Конфликты команд', report.team_conflicts || []);
+    html += rowsTable('Конфликты тренеров', report.coach_conflicts || []);
+    if (!html) {
+      html = '<div class="uk-text-success"><b>Деталей нет — всё чисто.</b></div>';
+    }
+    return html;
+  }
+
+  async function runCheck() {
+    const stageId = Number(document.getElementById('diagStage').value || 0);
+    if (!stageId) {
+      notify('Выбери этап', 'warning');
+      return;
+    }
+
+    const btn = document.getElementById('btnDiagCheck');
+    btn.disabled = true;
+    btn.innerHTML = '<span uk-spinner="ratio:0.7"></span> Проверяю...';
+
+    try {
+      const j = await apiGet(API_DIAG + '?stage_id=' + encodeURIComponent(stageId));
+      const summaryWrap = document.getElementById('diagSummaryWrap');
+      const detailsWrap = document.getElementById('diagDetailsWrap');
+      const summaryEl   = document.getElementById('diagSummary');
+      const detailsEl   = document.getElementById('diagDetails');
+
+      summaryEl.innerHTML = summaryHtml(j.summary || {}, Number(j.total_problems || 0));
+      detailsEl.innerHTML = detailsHtml(j.report || {});
+
+      summaryWrap.classList.remove('uk-hidden');
+      detailsWrap.classList.remove('uk-hidden');
+
+      if (j.has_problems) {
+        notify('Проверка завершена: найдены проблемы', 'warning');
+      } else {
+        notify('Проверка завершена: проблем не найдено', 'success');
+      }
+    } catch (e) {
+      notify(e.message || 'Ошибка проверки', 'danger');
+      console.error(e);
+    } finally {
+      btn.disabled = false;
+      btn.innerHTML = '<span uk-icon="search"></span> Проверка целостности';
+      if (window.UIkit && UIkit.icon) UIkit.icon(btn);
+    }
+  }
+
+  (async function(){
+    const user = await Admin.requireRole(['organizer']);
+    if (!user) return;
+
+    document.getElementById('who').textContent = user.login + ' • ' + user.role;
+    document.getElementById('btnLogout').addEventListener('click', () => Admin.logout());
+
+    try {
+      const cur = await apiGet(API_CURRENT);
+      const currentTournamentId = cur && cur.tournament ? Number(cur.tournament.id) : 0;
+      const currentStageId      = cur && cur.stage ? Number(cur.stage.id) : 0;
+
+      const currentLine = document.getElementById('diagCurrentLine');
+      currentLine.textContent = cur && cur.stage
+        ? ('Текущий этап: ' + cur.stage.name + ' #' + cur.stage.id)
+        : 'Текущий этап: —';
+
+      await loadTournaments(currentTournamentId);
+      const tSel = document.getElementById('diagTournament');
+      await loadStages(Number(tSel.value || 0), currentStageId);
+
+      tSel.addEventListener('change', async () => {
+        try {
+          await loadStages(Number(tSel.value || 0), 0);
+        } catch (e) {
+          notify(e.message || 'Ошибка загрузки этапов', 'danger');
+          console.error(e);
+        }
+      });
+
+      document.getElementById('btnDiagRefresh').addEventListener('click', async () => {
+        try {
+          const selectedTournamentId = Number(document.getElementById('diagTournament').value || 0);
+          await loadTournaments(selectedTournamentId);
+          await loadStages(Number(document.getElementById('diagTournament').value || 0), Number(document.getElementById('diagStage').value || 0));
+          notify('Списки обновлены', 'success');
+        } catch (e) {
+          notify(e.message || 'Ошибка обновления', 'danger');
+          console.error(e);
+        }
+      });
+
+      document.getElementById('btnDiagCheck').addEventListener('click', runCheck);
+
+    } catch (e) {
+      notify(e.message || 'Ошибка инициализации', 'danger');
+      console.error(e);
+    }
+  })();
+</script>
+
+</body>
+</html>

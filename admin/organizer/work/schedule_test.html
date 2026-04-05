@@ -1,0 +1,1688 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Schedule Lab (песочница)</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/uikit@3/dist/css/uikit.min.css">
+  <link rel="stylesheet" href="/admin/_admin.css?v=4">
+
+  <script src="https://cdn.jsdelivr.net/npm/uikit@3/dist/js/uikit.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/uikit@3/dist/js/uikit-icons.min.js"></script>
+
+  <script src="/admin/_admin.js?v=4" defer></script>
+  <style>
+    body{background:#fff}
+    .lab-wrap{max-width:1200px}
+    /* embed mode (для встраивания в organizer/schedule.html) */
+    body.embed .uk-container.uk-padding{padding:0}
+    body.embed .lab-wrap{max-width:none}
+    body.embed h1.lab-title,
+    body.embed .lab-desc{display:none}
+    body.embed .uk-card{box-shadow:none}
+    .muted{opacity:.65}
+    .cell{white-space:nowrap}
+    .cell .code{font-weight:600}
+    .cell .small{font-size:12px;opacity:.75}
+    .day-title{font-weight:600}
+    .unplaced{font-size:12px}
+    tr.oob-row td{ background: rgba(255,0,0,.08); }
+  tr.oob-row td.time{ color:#b00020; font-weight:600; }
+  tr.oob-row td .code{ color:#b00020; }
+  tr.oob-row td.empty{ color:#b00020; opacity:.75; }
+
+    /* конфликты тренеров: две команды одного тренера в одно время */
+    td.coach-conflict{ background: rgba(255,165,0,.12); box-shadow: inset 0 0 0 2px rgba(255,140,0,.65); }
+    td.coach-conflict .code{ color:#b85c00; }
+
+    /* зарезервированные дни под плей-офф */
+    .reserved-card{ background: rgba(0,0,0,.03); }
+
+    /* подстроки уплотнения */
+    tr.subrow td{ background: rgba(0, 123, 255, .04); }
+    tr.subrow td:first-child{ color:#6b7280; }
+    td.half-free{ color:#1f7a1f; font-weight:600; }
+    td.half-busy{ color:#7a5a00; }
+/* manual drag */
+.match{display:inline-block; padding:2px 4px; border-radius:4px;}
+.match.match-draggable{ cursor: grab; }
+.match.match-draggable:active{ cursor: grabbing; }
+
+td.drop-ok { outline: 2px solid #4caf50; outline-offset: -2px; }
+td.drop-bad { outline: 2px solid #f44336; outline-offset: -2px; }
+
+/* чтоб было видно, что subrow тоже цель */
+tr.subrow td[data-date] { cursor: pointer; }
+
+.cell.is-violation { outline: 2px solid #ff3b30; }
+.match.is-violation { box-shadow: 0 0 0 2px rgba(255,59,48,.25) inset; }
+
+/* coach highlight */
+.match{display:inline-block; padding:2px 4px; border-radius:4px; border:1px solid rgba(0,0,0,.06);}
+.match .coach-dot{
+  width:8px; height:8px;
+  border-radius:50%;
+  display:inline-block;
+  margin-right:6px;
+  vertical-align:middle;
+  box-shadow:0 0 0 1px rgba(0,0,0,.08);
+}
+
+</style>
+</head>
+<body>
+
+<script>
+  (function(){
+    try{
+      const p = new URLSearchParams(location.search);
+      if (p.get('embed') === '1') document.body.classList.add('embed');
+    }catch(e){}
+  })();
+</script>
+
+<div class="uk-container uk-padding lab-wrap">
+  <h1 class="uk-heading-medium uk-margin-remove-bottom lab-title">Schedule Lab (песочница)</h1>
+  <div class="uk-text-small uk-margin-small-top muted lab-desc">
+    Предпросмотр сетки времени + авторазмещение матчей из БД. Сохранение в БД — кнопкой «СОХРАНИТЬ В БД».
+  </div>
+
+  <div class="uk-card uk-card-default uk-card-body uk-margin">
+    <div class="uk-grid-small" uk-grid>
+      <div class="uk-width-1-2@s uk-width-1-3@m">
+        <label class="uk-form-label">Этап</label>
+        <div class="uk-form-controls">
+          <select id="stage_id" class="uk-select"></select>
+        </div>
+      </div>
+
+      <div class="uk-width-1-2@s uk-width-1-3@m">
+        <label class="uk-form-label">Фаза</label>
+        <div class="uk-form-controls uk-margin-small-top">
+          <span class="uk-label">Только группы (phase=group)</span>
+          <div class="uk-text-small muted uk-margin-small-top">Плей-офф генерируется отдельно: <span class="uk-text-bold">/admin/organizer/work/playoff_test.html</span></div>
+        </div>
+      </div>
+
+      <div class="uk-width-1-2@s uk-width-1-3@m">
+        <label class="uk-form-label">Приоритет</label>
+        <div class="uk-form-controls">
+          <select id="prefer" class="uk-select">
+            <option value="single">Авто: максимум заполнения (сначала 4, пары — по необходимости)</option>
+            <option value="pair">Авто (наоборот): пары в приоритете, 4 поля — по необходимости</option>
+          </select>
+        </div>
+      </div>
+
+
+
+      <div class="uk-width-1-2@s uk-width-1-3@m">
+        <label class="uk-form-label">Уплотнение 12/34</label>
+        <div class="uk-form-controls">
+          <select id="mix_12_34" class="uk-select">
+            <option value="OFF">OFF — без уплотнения</option>
+            <option value="A" selected>AUTO (A) — если даёт пользу</option>
+            <option value="HARD">HARD — можно двигать 1↔2↔3↔4 внутри слота</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="uk-width-1-2@s uk-width-1-3@m">
+        <label class="uk-form-label">Показывать</label>
+        <div class="uk-form-controls">
+          <select id="show" class="uk-select">
+            <option value="code">только коды</option>
+            <option value="teams">коды + команды/схема</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="uk-width-1-2@s uk-width-1-3@m">
+         <label class="uk-form-label">Ограничения команд по времени (опция)</label>
+         <div class="uk-form-controls">
+            <button class="uk-button uk-button-default" id="btnConstraints">Настроить</button>
+         </div>
+      </div>
+
+      <div class="uk-width-1-1">
+        <button id="btn_build" class="uk-button uk-button-primary">ПОСТРОИТЬ</button>
+        <button id="btn_copy" class="uk-button uk-button-default">КОПИРОВАТЬ JSON</button>
+        <button id="btn_save" class="uk-button uk-button-secondary">СОХРАНИТЬ В БД</button>
+
+        <label class="uk-margin-left uk-text-small">
+          <input class="uk-checkbox" type="checkbox" id="manual_mode">
+          Ручной режим (drag / swap)
+        </label>
+        <span id="status" class="uk-margin-left muted">…</span>
+      </div>
+    </div>
+  </div>
+
+  <div id="out"></div>
+</div>
+
+<div id="modalConstraints" uk-modal>
+  <div class="uk-modal-dialog uk-modal-dialog-large uk-modal-body">
+    <h3 class="uk-modal-title">Заморозка команды (не раньше / не позже)</h3>
+
+    <div class="uk-grid-small" uk-grid>
+<div class="uk-width-1-2@s" id="cDayWrap">
+  <label class="uk-form-label">День</label>
+
+  <!-- фиксируем упрощённый режим: ограничение только для 1-го дня групп -->
+  <select class="uk-select" id="cDay" style="display:none"></select>
+  <div class="uk-text-meta">Ограничение задаётся только для первого дня групп (для всех смен этого дня).</div>
+</div>
+
+      <div class="uk-width-1-2@s">
+        <label class="uk-form-label">Команда</label>
+        <select class="uk-select" id="cSquad"></select>
+      </div>
+
+      <div class="uk-width-1-2@s">
+        <label class="uk-form-label">Не раньше слота</label>
+        <select class="uk-select" id="cNotBefore"></select>
+      </div>
+
+      <div class="uk-width-1-2@s">
+        <label class="uk-form-label">Не позже слота</label>
+        <select class="uk-select" id="cNotAfter"></select>
+      </div>
+
+      <div class="uk-width-1-1">
+        <label class="uk-form-label">Комментарий</label>
+        <input class="uk-input" id="cComment" placeholder="например: автобус, приедут к 10:30">
+      </div>
+    </div>
+
+    <div class="uk-margin-top uk-flex uk-flex-between">
+      <div>
+        <button class="uk-button uk-button-primary" id="cSave">Сохранить</button>
+        <button class="uk-button uk-button-default uk-modal-close">Закрыть</button>
+      </div>
+      <div class="uk-text-meta" id="cHint"></div>
+    </div>
+
+    <hr class="uk-margin">
+
+    <div class="uk-overflow-auto">
+      <table class="uk-table uk-table-small uk-table-divider">
+        <thead>
+        <tr>
+          <th>ID</th><th>Команда</th><th>Диапазон</th><th>Комментарий</th><th></th>
+        </tr>
+        </thead>
+        <tbody id="cList"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<script>
+(() => {
+  const API_CURRENT    = '/api/tournament/current.php';
+  const API_STAGES     = '/api/tournament/stages.php';
+  const API_SCHEDULE_SAVE = '/api/tournament/schedule_save.php';
+  const API_LAB        = '/api/tournament/schedule_lab.php';
+
+  const API_SQUADS     = '/api/tournament/squads.php';
+  const API_CONS       = '/api/tournament/squad_constraints.php';
+  const API_CONS_S     = '/api/tournament/squad_constraints_save.php';
+  const API_CONS_D     = '/api/tournament/squad_constraints_delete.php';
+
+  const $ = (id) => document.getElementById(id);
+
+  let lastJson = null;
+
+  // --- caches ---
+  let labDaysCache = null;
+  let consCacheAll = null;
+  let squadsCache = null;
+
+// ---- coach colors (soft, same tonality) ----
+let coachNameById = new Map();
+let coachColorCache = new Map();
+let coachPaletteStageId = 0;
+
+function _hslToRgb(h, s, l){
+  // h: 0..360, s/l: 0..100
+  h /= 360; s /= 100; l /= 100;
+  const hue2rgb = (p, q, t) => {
+    if (t < 0) t += 1;
+    if (t > 1) t -= 1;
+    if (t < 1/6) return p + (q - p) * 6 * t;
+    if (t < 1/2) return q;
+    if (t < 2/3) return p + (q - p) * (2/3 - t) * 6;
+    return p;
+  };
+  let r, g, b;
+  if (s === 0){
+    r = g = b = l;
+  } else {
+    const q = l < 0.5 ? l * (1 + s) : l + s - l * s;
+    const p = 2 * l - q;
+    r = hue2rgb(p, q, h + 1/3);
+    g = hue2rgb(p, q, h);
+    b = hue2rgb(p, q, h - 1/3);
+  }
+  return [Math.round(r*255), Math.round(g*255), Math.round(b*255)];
+}
+
+function _coachColor(coachId){
+  coachId = Number(coachId || 0);
+  if (!coachId) return null;
+  if (coachColorCache.has(coachId)) return coachColorCache.get(coachId);
+
+  const seed = (coachId * 2654435761) >>> 0;
+
+  // холодный диапазон, но широкий: зелёный-циан-синий-фиолетовый
+  let h = 170 + (seed % 141); // 170..310
+
+  // делаем оттенок "кратно 6", чтобы цвета были более отличимы (ступеньками)
+  h = 170 + (Math.floor((h - 170) / 6) * 6);
+
+  // Accent: темнее/насыщеннее (для точек/бордеров)
+  const [ar,ag,ab] = _hslToRgb(h, 72, 42);
+
+  // Background: очень мягкий (для заливки)
+  const [br,bg,bb] = _hslToRgb(h, 55, 86);
+
+  const c = {
+    accent: `rgb(${ar},${ag},${ab})`,
+    bg:     `rgba(${br},${bg},${bb},0.55)`,
+  };
+
+  coachColorCache.set(coachId, c);
+  return c;
+}
+
+
+function _buildCoachNameMap(){
+  coachNameById = new Map();
+  if (!Array.isArray(squadsCache)) return;
+  for (const s of squadsCache){
+    const cid = Number(s.coach_id || 0);
+    if (!cid) continue;
+    const nm = (s.coach_name || '').trim();
+    if (nm && !coachNameById.has(cid)) coachNameById.set(cid, nm);
+  }
+}
+
+async function ensureCoachPalette(stageId){
+  // грузим squads один раз на этап, чтобы знать coach_name (цвета можно и без имён)
+  if (coachPaletteStageId === stageId && coachNameById.size) return;
+  const sq = await apiGet(`${API_SQUADS}?stage_id=${stageId}`);
+  if (sq.ok){
+    squadsCache = sq.items || [];
+    _buildCoachNameMap();
+    coachPaletteStageId = stageId;
+  }
+}
+
+  // --- constraints: group day blocks (each entry in lab.days[]) ---
+  // day_id is deterministic hash of (date|start|end|cols)
+  let groupDayBlocks = [];              // [{day_id, day_key, date, start, end, slots, ...}]
+  let groupBlocksById = {};             // {day_id: block}
+
+  // manual mode state
+  let manualMode = false;
+  let dragMatchId = 0;
+  let lastDropCell = null;
+  let previewTimer = null;
+
+  // ---------------- utils ----------------
+  function esc(s){
+    return String(s ?? '').replace(/[&<>"']/g, (c)=>( {
+      '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
+    }[c]));
+  }
+
+  function debounce(fn, ms=200){
+    clearTimeout(previewTimer);
+    previewTimer = setTimeout(fn, ms);
+  }
+
+  async function safeJson(res){
+    const txt = await res.text();
+    try { return JSON.parse(txt); } catch(e){
+      return { ok:false, error:'Bad JSON', raw:txt };
+    }
+  }
+
+  async function apiGet(url){
+    const res = await fetch(url, {credentials:'same-origin', cache:'no-store'});
+    return await safeJson(res);
+  }
+
+  // JSON POST (оставляем для move_preview и прочих где точно JSON)
+  async function apiPostJson(url, payload){
+    const res = await fetch(url, {
+      method:'POST',
+      credentials:'same-origin',
+      cache:'no-store',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify(payload || {})
+    });
+    return await safeJson(res);
+  }
+
+  // FORM POST (для PHP-эндпоинтов, которые ждут application/x-www-form-urlencoded)
+  // + важное: можно продублировать ключи в query-string (если сервер читает $_GET)
+  async function apiPostForm(url, payload, alsoInQueryKeys = []){
+    const obj = payload || {};
+    const params = new URLSearchParams();
+    for (const k of Object.keys(obj)){
+      const v = obj[k];
+      if (v === undefined || v === null || v === '') continue;
+      params.set(k, String(v));
+    }
+
+    let finalUrl = url;
+    if (alsoInQueryKeys && alsoInQueryKeys.length){
+      const u = new URL(url, window.location.origin);
+      for (const k of alsoInQueryKeys){
+        if (obj[k] !== undefined && obj[k] !== null && obj[k] !== '') {
+          u.searchParams.set(k, String(obj[k]));
+        }
+      }
+      finalUrl = u.pathname + (u.search ? u.search : '');
+    }
+
+    const res = await fetch(finalUrl, {
+      method:'POST',
+      credentials:'same-origin',
+      cache:'no-store',
+      headers:{'Content-Type':'application/x-www-form-urlencoded; charset=UTF-8'},
+      body: params.toString()
+    });
+    return await safeJson(res);
+  }
+
+  function getStageId(){
+    return Number($('stage_id')?.value || 0);
+  }
+
+  function fillSelect(sel, items, getVal, getText, withEmpty=true){
+    sel.innerHTML = '';
+    if (withEmpty){
+      const o = document.createElement('option');
+      o.value = '';
+      o.textContent = '—';
+      sel.appendChild(o);
+    }
+    for (const it of (items || [])){
+      const o = document.createElement('option');
+      o.value = String(getVal(it));
+      o.textContent = String(getText(it));
+      sel.appendChild(o);
+    }
+  }
+
+  function buildParams(){
+    const stage_id = Number($('stage_id')?.value || 0);
+    const prefer = $('prefer')?.value || 'auto_fill';
+    const mix = $('mix_12_34')?.value || 'AUTO';
+    const show = $('show')?.value || 'codes';
+
+    const qs = new URLSearchParams();
+    qs.set('stage_id', String(stage_id));
+    qs.set('prefer', prefer);
+    qs.set('mix_12_34', mix);
+    qs.set('show', show);
+    return qs;
+  }
+
+  function buildUrl(){
+    return `${API_LAB}?${buildParams().toString()}`;
+  }
+
+  // ---------------- constraints: day blocks helpers ----------------
+  function hash32(str){
+    // deterministic 32-bit hash (FNV-1a)
+    let h = 0x811c9dc5;
+    for (let i=0;i<str.length;i++){
+      h ^= str.charCodeAt(i);
+      h = (h + ((h<<1) + (h<<4) + (h<<7) + (h<<8) + (h<<24))) >>> 0;
+    }
+    return h >>> 0;
+  }
+
+  function makeDayKey(date, start, end, cols){
+    const c = Array.isArray(cols) ? cols.map(String) : [];
+    return `${String(date||'')}|${String(start||'')}|${String(end||'')}|${c.join(',')}`;
+  }
+
+  function dayIdFromParts(date, start, end, cols){
+    return Number(hash32(makeDayKey(date, start, end, cols))) || 0;
+  }
+
+  function buildGroupBlocksFromLab(){
+    const days = Array.isArray(labDaysCache?.days) ? labDaysCache.days : [];
+    const blocks = days.filter(d => d && d.block !== 'reserved');
+
+    blocks.sort((a,b)=>{
+      const da = String(a.date||'');
+      const db = String(b.date||'');
+      if (da !== db) return da.localeCompare(db);
+      const sa = String(a.start||'');
+      const sb = String(b.start||'');
+      return sa.localeCompare(sb);
+    });
+
+    groupDayBlocks = [];
+    groupBlocksById = {};
+
+    for (const b of blocks){
+      const date = String(b.date||'');
+      const start = String(b.start||'');
+      const end = String(b.end||'');
+      const cols = Array.isArray(b.cols) ? b.cols.map(String) : [];
+      const key = makeDayKey(date, start, end, cols);
+      const day_id = dayIdFromParts(date, start, end, cols);
+
+      const bb = {
+        day_id,
+        day_key: key,
+        date,
+        start,
+        end,
+        end_official: String(b.end_official||''),
+        fields: Number(b.fields||0),
+        mode: String(b.mode||''),
+        cols,
+        slots: Array.isArray(b.slots) ? b.slots.map(String) : [],
+      };
+
+      groupDayBlocks.push(bb);
+      groupBlocksById[String(day_id)] = bb;
+    }
+
+    return groupDayBlocks;
+  }
+
+  // --- constraint: one record per DATE (первый день), применяется ко всем сменам этого дня ---
+  function dayIdFromDateOnly(date){
+    const s = String(date || '').replace(/-/g,'');
+    return Number(s) || 0; // e.g. 20260328
+  }
+
+  function buildGlobalDaySlots(blocks){
+    const uniq = new Set();
+    for (const b of (blocks || [])){
+      const slots = Array.isArray(b?.slots) ? b.slots : [];
+      for (const t of slots){
+        if (t) uniq.add(String(t));
+      }
+    }
+    const times = Array.from(uniq);
+    times.sort((a,b)=>String(a).localeCompare(String(b)));
+    const map = {};
+    for (let i=0;i<times.length;i++) map[times[i]] = i+1;
+    return { times, map };
+  }
+
+  function globalSlotNoForTime(times, time, mode){
+    const t = String(time || '');
+    if (!t) return null;
+
+    if (mode === 'na'){
+      let last = 0;
+      for (let i=0;i<times.length;i++){
+        if (String(times[i]) <= t) last = i+1;
+      }
+      return last; // 0 = раньше первого слота
+    }
+
+    for (let i=0;i<times.length;i++){
+      if (String(times[i]) >= t) return i+1;
+    }
+    return times.length + 1; // позже всех слотов => запретить всё
+  }
+
+  function getGlobalSlotNoFromAssignment(j, a){
+    const date = String(a?.date || '');
+    const localNo = Number(a?.slot_no || 0);
+    if (!date || !localNo) return localNo;
+
+    if (!getGlobalSlotNoFromAssignment._cache) getGlobalSlotNoFromAssignment._cache = {};
+    const cache = getGlobalSlotNoFromAssignment._cache;
+
+    if (!cache[date]){
+      const uniq = new Set();
+      const days = Array.isArray(j?.days) ? j.days : [];
+      for (const d of days){
+        if (!d || d.block === 'reserved') continue;
+        if (String(d.date||'') !== date) continue;
+        const slots = Array.isArray(d.slots) ? d.slots : [];
+        for (const t of slots) if (t) uniq.add(String(t));
+      }
+      const times = Array.from(uniq).sort((a,b)=>String(a).localeCompare(String(b)));
+      const map = {};
+      for (let i=0;i<times.length;i++) map[times[i]] = i+1;
+      cache[date] = { times, map };
+    }
+
+    // берём точное время матча из a.time (если есть), иначе — по slot_no внутри смены
+    let t = String(a?.time || '');
+    if (!t){
+      const found = findDayBlockForAssignment(j, a);
+      if (found?.day?.slots && found.day.slots[localNo-1]) t = String(found.day.slots[localNo-1]);
+    }
+
+    if (t && cache[date].map[t]) return cache[date].map[t];
+    return localNo;
+  }
+
+
+  function getFirstGroupBlock(){
+    return (groupDayBlocks && groupDayBlocks.length) ? groupDayBlocks[0] : null;
+  }
+
+  function isPickDayEnabled(){
+    // упрощённый режим: только первый день групп
+    return false;
+  }
+
+function getFirstGroupDate(){
+    const b0 = getFirstGroupBlock();
+    return b0 ? String(b0.date || '') : '';
+  }
+
+  // default: selected DATE scope (all shifts of that date)
+  function getSelectedConstraintDate(){
+    const d0 = getFirstGroupDate();
+    if (!isPickDayEnabled()) return d0;
+    const id = Number($('cDay').value || 0) || 0;
+    const b = groupBlocksById[String(id)] || null;
+    return b ? String(b.date || '') : d0;
+  }
+
+  function getSelectedConstraintDayId(){
+    const b0 = getFirstGroupBlock();
+    if (!isPickDayEnabled()) return b0 ? b0.day_id : 0;
+    return Number($('cDay').value || 0) || (b0 ? b0.day_id : 0) || 0;
+  }
+
+  function getSelectedConstraintBlock(){
+    const b0 = getFirstGroupBlock();
+    const id = getSelectedConstraintDayId();
+    return groupBlocksById[String(id)] || b0 || null;
+  }
+
+  function getBlocksForConstraintScope(){
+    const allDays = !!$('cAllDays')?.checked;
+    if (allDays) return groupDayBlocks.slice();
+
+    if (isPickDayEnabled()){
+      const b = getSelectedConstraintBlock();
+      return b ? [b] : [];
+    }
+
+    const date = getSelectedConstraintDate();
+    return groupDayBlocks.filter(b=>String(b.date||'')===String(date));
+  }
+
+  function rebuildSlotSelects(){
+    const allDays = !!$('cAllDays')?.checked;
+    const pickDay = isPickDayEnabled();
+    const b = getSelectedConstraintBlock();
+    if (!b) return;
+
+    // ВАЖНО:
+    // - если allDays ИЛИ dateMode (pickDay off) -> выбираем ВРЕМЯ ("15:30"), потом на каждый блок конвертируем в slot_no
+    // - если pickDay -> выбираем СЛОТЫ этого блока (1..N) с подписью времени
+    if (allDays || !pickDay){
+      // union of times for that scope
+      const blocks = allDays ? groupDayBlocks : getBlocksForConstraintScope();
+      const seen = new Set();
+      const times = [];
+      for (const bb of blocks){
+        for (const t of (bb.slots||[])){
+          if (seen.has(t)) continue;
+          seen.add(t);
+          times.push(t);
+        }
+      }
+      times.sort((a,b)=>String(a).localeCompare(String(b)));
+      const opts = times.map(t=>({val:t, text:t}));
+      fillSelect($('cNotBefore'), opts, o=>o.val, o=>o.text, true);
+      fillSelect($('cNotAfter'),  opts, o=>o.val, o=>o.text, true);
+      return;
+    }
+
+    // pickDay => slot numbers of selected block
+    const slotOpts = (b.slots || []).map((t, idx)=>({no: idx+1, time: t}));
+    fillSelect($('cNotBefore'), slotOpts, s=>s.no, s=>`${s.no} — ${s.time}`, true);
+    fillSelect($('cNotAfter'),  slotOpts, s=>s.no, s=>`${s.no} — ${s.time}`, true);
+  }
+
+  // ---------------- lab preload for modal (days+slots) ----------------
+  async function ensureLabCache(){
+    const stageId = getStageId();
+    if (!stageId) return { ok:false, error:'stage_id is required' };
+
+    const url = buildUrl();
+    const j = await apiGet(url);
+    if (!j.ok) return j;
+
+    labDaysCache = j;
+    buildGroupBlocksFromLab();
+
+    if (!groupDayBlocks.length) {
+      return { ok:false, error:'Нет доступных дней (или всё reserved)' };
+    }
+
+    return { ok:true };
+  }
+
+  // ---------------- constraints fetch / map ----------------
+  async function loadConstraintsAll(stageId){
+    const j = await apiGet(`${API_CONS}?stage_id=${stageId}`);
+    if (!j.ok) return { ok:false, error:j.error || 'ошибка', items:[], mapByDate:{}, mapByDayId:{} };
+
+    const mapByDate = {};   // fallback
+    const mapByDayId = {};  // preferred
+    for (const c of (j.items || [])){
+      const date = String(c.day_date || c.date || '');
+      const dayId = Number(c.day_id || 0) || 0;
+      const sid = Number(c.squad_id || 0);
+      if (!date || !sid) continue;
+
+      const entry = {
+        id: Number(c.id || 0),
+        nb: c.not_before_slot_no ? Number(c.not_before_slot_no) : null,
+        na: c.not_after_slot_no  ? Number(c.not_after_slot_no)  : null,
+        comment: String(c.comment || '')
+      };
+
+      if (dayId > 0){
+        if (!mapByDayId[dayId]) mapByDayId[dayId] = {};
+        mapByDayId[dayId][sid] = entry;
+      } else {
+        if (!mapByDate[date]) mapByDate[date] = {};
+        mapByDate[date][sid] = entry;
+      }
+    }
+
+    return { ok:true, items:(j.items||[]), mapByDate, mapByDayId };
+  }
+
+  async function loadConstraintsByBlock(stageId, block){
+    if (!block) return { ok:false, error:'day block not found', items:[] };
+    const dayId = Number(block.day_id || 0) || 0;
+    const date = String(block.date || '');
+    const qs = dayId > 0
+      ? `day_id=${encodeURIComponent(String(dayId))}`
+      : `date=${encodeURIComponent(date)}`;
+    const j = await apiGet(`${API_CONS}?stage_id=${stageId}&${qs}`);
+    if (!j.ok) return { ok:false, error:j.error || 'ошибка', items:[] };
+    return { ok:true, items:(j.items||[]) };
+  }
+
+  async function loadConstraintsByDate(stageId, date){
+    const d = String(date || '');
+    const url = d
+      ? `${API_CONS}?stage_id=${stageId}&date=${encodeURIComponent(d)}`
+      : `${API_CONS}?stage_id=${stageId}`;
+
+    const j = await apiGet(url);
+    if (!j.ok) return { ok:false, error:j.error || 'ошибка', items:[] };
+    return { ok:true, items:(j.items||[]) };
+  }
+
+  function slotNoForTimeInBlock(block, time, kind){
+    // kind: 'nb' => first >= time, 'na' => last <= time
+    if (!block || !time) return null;
+    const t = String(time);
+    const slots = block.slots || [];
+    if (!slots.length) return null;
+
+    if (kind === 'nb'){
+      for (let i=0;i<slots.length;i++){
+        if (String(slots[i]) >= t) return i+1;
+      }
+      // позже последнего слота => запрет всей смены
+      return slots.length + 1;
+    }
+
+    for (let i=slots.length-1;i>=0;i--){
+      if (String(slots[i]) <= t) return i+1;
+    }
+    return null;
+  }
+
+  async function constraintsRefreshList(){
+    const stageId = getStageId();
+    const tb = $('cList');
+    tb.innerHTML = '';
+
+    if (!stageId){
+      tb.innerHTML = `<tr><td colspan="6" class="muted">Не выбран этап</td></tr>`;
+      return;
+    }
+
+    const pickDay = isPickDayEnabled();
+    const allDays = !!$('cAllDays')?.checked;
+    const block = getSelectedConstraintBlock();
+    const date = String(block?.date || '');
+
+    if (!block || !date){
+      tb.innerHTML = `<tr><td colspan="6" class="muted">Не найден день</td></tr>`;
+      return;
+    }
+
+    // list scope: если pickDay => конкретный блок, иначе по дате (все смены) — как у тебя в UI
+    let r;
+    if (pickDay) r = await loadConstraintsByBlock(stageId, block);
+    else r = await loadConstraintsByDate(stageId, date);
+
+    if (!r.ok){
+      tb.innerHTML = `<tr><td colspan="6" class="muted">Ошибка: ${esc(r.error)}</td></tr>`;
+      return;
+    }
+
+    if (!(r.items || []).length){
+      tb.innerHTML = `<tr><td colspan="6" class="muted">Ограничений нет</td></tr>`;
+      return;
+    }
+
+    for (const c of (r.items || [])){
+      const dayId = Number(c.day_id || 0) || 0;
+      const b = dayId ? (groupBlocksById[String(dayId)] || null) : null;
+
+      const nb = c.not_before_slot_no ? Number(c.not_before_slot_no) : 0;
+      const na = c.not_after_slot_no ? Number(c.not_after_slot_no) : 0;
+
+      const dateForRow = String(c.day_date || (b ? b.date : '') || date || '');
+      const dayBlocks = groupDayBlocks.filter(x => String(x.date||'') === dateForRow);
+      const glob = buildGlobalDaySlots(dayBlocks.length ? dayBlocks : (b ? [b] : []));
+      const slotsForView = glob.times;
+
+      const tByNo = {};
+      for (let i=0;i<slotsForView.length;i++) tByNo[i+1] = slotsForView[i];
+
+      const range = `${nb ? (nb + (tByNo[nb] ? ` (${tByNo[nb]})` : '')) : '—'} … ${na ? (na + (tByNo[na] ? ` (${tByNo[na]})` : '')) : '—'}`;
+
+      const shifts = dayBlocks.map(bb => `${bb.start}–${bb.end} (${(bb.cols||[]).join('/')})`).join(' / ');
+      const bLabel = shifts ? `${dateForRow} ${shifts}` : (dateForRow || '—');
+
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td>${esc(c.id)}</td>
+        <td>${esc(bLabel)}</td>
+        <td>${esc(c.squad_name || ('#'+c.squad_id))}</td>
+        <td>${esc(range)}</td>
+        <td>${esc(c.comment || '')}</td>
+        <td class="uk-text-right">
+          <button class="uk-button uk-button-danger uk-button-small" data-del="${esc(c.id)}">Удалить</button>
+        </td>
+      `;
+      tb.appendChild(tr);
+    }
+
+    tb.querySelectorAll('[data-del]').forEach(btn=>{
+      btn.addEventListener('click', async ()=>{
+        const id = Number(btn.getAttribute('data-del') || 0);
+        if (!id) return;
+
+        // delete: JSON (API читает php://input)
+        const del = await apiPostJson(API_CONS_D, { id });
+        if (!del.ok){
+          UIkit.notification(del.error || 'Не смог удалить', {status:'danger'});
+          return;
+        }
+        await constraintsRefreshList();
+        if (lastJson?.ok) applyConstraintHighlights();
+      });
+    });
+  }
+
+  // ---------------- constraints: highlight (ALL DAYS) ----------------
+  function clearConstraintHighlights(){
+    document.querySelectorAll('.is-violation').forEach(el=>{
+      el.classList.remove('is-violation');
+      if (el.dataset && el.dataset.violationTitle === '1') {
+        el.removeAttribute('title');
+        delete el.dataset.violationTitle;
+      }
+    });
+  }
+
+  // ВАЖНО: определяем day_id по конкретному day-блоку из lastJson.days (а не через "global slot")
+  function findDayBlockForAssignment(j, a){
+    const date = String(a?.date || '');
+    const slotNo = Number(a?.slot_no || 0);
+    const time = String(a?.time || '');
+    const field = String(a?.field_code || '');
+    if (!date || !slotNo) return null;
+
+    const days = Array.isArray(j?.days) ? j.days : [];
+    for (const d of days){
+      if (!d || d.block === 'reserved') continue;
+      if (String(d.date||'') !== date) continue;
+
+      const slots = Array.isArray(d.slots) ? d.slots : [];
+      const t = slots[slotNo-1] ? String(slots[slotNo-1]) : '';
+      if (time && t && t !== time) continue; // точное совпадение времени внутри смены
+      if (field && Array.isArray(d.cols) && d.cols.length && !d.cols.map(String).includes(field)) continue;
+
+      const day_id = dayIdFromParts(d.date, d.start, d.end, d.cols);
+      return { day_id, day: d };
+    }
+    return null;
+  }
+
+  async function applyConstraintHighlights(){
+    clearConstraintHighlights();
+    if (!lastJson?.ok) return;
+
+    const stageId = getStageId();
+    if (!stageId) return;
+
+    const all = await loadConstraintsAll(stageId);
+    if (!all.ok) return;
+    consCacheAll = all;
+
+    const mapByDayId = all.mapByDayId || {};
+    const mapByDate  = all.mapByDate  || {};
+    if (!Object.keys(mapByDate).length && !Object.keys(mapByDayId).length) return;
+
+    const byMid = new Map();
+    for (const a of (lastJson.assignments || [])){
+      byMid.set(Number(a.match_id), a);
+    }
+
+    document.querySelectorAll('td[data-mid]').forEach(td=>{
+      const mid = Number(td.dataset.mid || 0);
+      if (!mid) return;
+
+      const a = byMid.get(mid);
+      if (!a) return;
+
+      const date = String(a.date || '');
+      if (!date) return;
+
+      const slotNo = getGlobalSlotNoFromAssignment(lastJson, a);
+
+      // ограничения храним по дате (одна запись на день)
+      const dayId = dayIdFromDateOnly(date);
+
+      const cMap = dayId > 0 ? (mapByDayId[dayId] || null) : (mapByDate[date] || null);
+      if (!cMap) return;
+
+      const h = Number(a.home_squad_id || 0);
+      const g = Number(a.away_squad_id || 0);
+
+      const reasons = [];
+      for (const sid of [h,g]){
+        const c = cMap[sid];
+        if (!c) continue;
+        if (c.nb && slotNo < c.nb) reasons.push(`команда #${sid}: не раньше слота ${c.nb}`);
+        if (c.na && slotNo > c.na) reasons.push(`команда #${sid}: не позже слота ${c.na}`);
+      }
+
+      if (reasons.length){
+        td.classList.add('is-violation');
+        const m = td.querySelector('.match');
+        if (m) m.classList.add('is-violation');
+
+        td.title = reasons.join('\n');
+        td.dataset.violationTitle = '1';
+      }
+    });
+  }
+
+  // ---------------- constraints: modal logic ----------------
+  function setPickDayUI(enabled){
+    const sel = $('cDay');
+    if (!sel) return;
+
+    sel.style.display = enabled ? '' : 'none';
+    if (!enabled){
+      const b0 = getFirstGroupBlock();
+      if (b0) sel.value = String(b0.day_id);
+    }
+  }
+
+  async function constraintsOpenModal(){
+    const stageId = getStageId();
+    if (!stageId){
+      UIkit.notification('Выбери этап', {status:'warning'});
+      return;
+    }
+
+    $('cHint').textContent = 'загружаю сетку дней…';
+
+    const labOk = await ensureLabCache();
+    if (!labOk.ok){
+      $('cHint').textContent = '';
+      UIkit.notification(labOk.error || 'Не смог загрузить сетку', {status:'danger'});
+      return;
+    }
+
+    const groupDays = groupDayBlocks.slice();
+    const day0 = groupDays[0] || null;
+    if (!day0){
+      $('cHint').textContent = '';
+      UIkit.notification('Нет доступных дней (или всё reserved)', {status:'warning'});
+      return;
+    }
+
+    fillSelect(
+      $('cDay'),
+      groupDays,
+      d=>d.day_id,
+      d=>`${d.date} • ${d.start}–${d.end} • поля:${d.fields || 0}${(d.cols&&d.cols.length)?` (${d.cols.join('/')})`:''}`,
+      false
+    );
+
+    if ($('cPickDay')) $('cPickDay').checked = false;
+    $('cDay').value = String(day0.day_id);
+    setPickDayUI(false);
+
+    if ($('cAllDays')) $('cAllDays').checked = false;
+
+    rebuildSlotSelects();
+
+    $('cHint').textContent = 'загружаю команды…';
+    if (!squadsCache){
+      const sq = await apiGet(`${API_SQUADS}?stage_id=${stageId}`);
+      if (!sq.ok){
+        $('cHint').textContent = '';
+        UIkit.notification(sq.error || 'Не смог загрузить команды', {status:'danger'});
+        return;
+      }
+      squadsCache = sq.items || [];
+    }
+    fillSelect($('cSquad'), squadsCache, it=>it.id, it=>`${it.category} — ${it.name}`, false);
+
+    $('cHint').textContent = 'загружаю ограничения…';
+    await constraintsRefreshList();
+    $('cHint').textContent = '';
+
+    UIkit.modal('#modalConstraints').show();
+  }
+
+  async function constraintsSave(){
+    const stageId = getStageId();
+    const squadId = Number($('cSquad')?.value || 0);
+const nbRaw = $('cNotBefore')?.value || '';
+    const naRaw = $('cNotAfter')?.value || '';
+    const comment = String($('cComment')?.value || '').trim();
+
+    if (!stageId){
+      UIkit.notification('Не выбран этап', {status:'warning'});
+      return;
+    }
+    if (!squadId){
+      UIkit.notification('Выбери команду', {status:'warning'});
+      return;
+    }
+
+    const pickDay = isPickDayEnabled();
+    const selBlock = getSelectedConstraintBlock();
+    if (!selBlock){
+      UIkit.notification('Не выбран день', {status:'warning'});
+      return;
+    }
+
+    const blocksToApply = getBlocksForConstraintScope();
+    const dateMode = true;
+// validate time string ordering in dateMode/allDays
+    if (dateMode && nbRaw && naRaw && String(nbRaw) > String(naRaw)){
+      UIkit.notification('Не раньше > Не позже (время)', {status:'danger'});
+      return;
+    }
+
+    // грузим все ограничения один раз (для поиска existing по day_id+squad)
+    const all = await loadConstraintsAll(stageId);
+    if (!all.ok){
+      UIkit.notification(all.error || 'Не смог загрузить ограничения', {status:'danger'});
+      return;
+    }
+
+    // один день (дата) => один day_id (yyyymmdd) и глобальная нумерация слотов по всем сменам этого дня
+    const date = blocksToApply[0] ? String(blocksToApply[0].date||'') : '';
+    if (!date){
+      UIkit.notification('Не выбран день', {status:'warning'});
+      return;
+    }
+
+    const dayId = dayIdFromDateOnly(date);
+    const glob = buildGlobalDaySlots(blocksToApply);
+
+    let nbSlot = nbRaw ? globalSlotNoForTime(glob.times, nbRaw, 'nb') : null;
+    let naSlot = naRaw ? globalSlotNoForTime(glob.times, naRaw, 'na') : null;
+
+    if (nbSlot !== null && naSlot !== null && nbSlot > 0 && naSlot > 0 && nbSlot > naSlot){
+      UIkit.notification('Не раньше > Не позже', {status:'danger'});
+      return;
+    }
+
+    // если "не позже" раньше первого слота — считаем, что запретили всё
+    if (naSlot === 0 && nbSlot === null){
+      nbSlot = glob.times.length + 1;
+      naSlot = null;
+    }
+
+    // existing by (day_id(date) + squad_id)
+    const existingEntry = (all.mapByDayId?.[dayId] || {})[squadId] || null;
+    const id = existingEntry ? Number(existingEntry.id || 0) : 0;
+
+    const r = await apiPostJson(API_CONS_S, {
+      id: id || 0,
+      stage_id: stageId,
+      squad_id: squadId,
+      day_id: dayId,
+      date: date,
+      not_before_slot_no: (nbSlot === null ? null : nbSlot),
+      not_after_slot_no: (naSlot === null ? null : naSlot),
+      comment: comment
+    });
+
+    if (!r.ok){
+      UIkit.notification(r.error || `Не смог сохранить (${date})`, {status:'danger'});
+      return;
+    }
+
+    if ($('cComment')) $('cComment').value = '';
+
+    await constraintsRefreshList();
+    if (lastJson?.ok) await applyConstraintHighlights();
+
+    UIkit.notification('Сохранено (только 1-й день групп)', {status:'success'});
+  }
+
+  
+
+  function bindConstraintDayControls(){
+    if ($('cPickDay')){
+      $('cPickDay').addEventListener('change', async ()=>{
+        const enabled = !!$('cPickDay').checked;
+        setPickDayUI(enabled);
+
+        rebuildSlotSelects();
+        await constraintsRefreshList();
+      });
+    }
+
+    if ($('cDay')){
+      $('cDay').addEventListener('change', async ()=>{
+        rebuildSlotSelects();
+        await constraintsRefreshList();
+      });
+    }
+
+    if ($('cAllDays')){
+      $('cAllDays').addEventListener('change', ()=>{
+        rebuildSlotSelects();
+      });
+    }
+  }
+
+  // ---------------- move preview ----------------
+  function findDayByDate(j, date){
+    return (j.days || []).find(d => d.date === date) || null;
+  }
+
+  function timeBySlot(j, date, slotNo){
+    const d = findDayByDate(j, date);
+    const idx = Number(slotNo) - 1;
+    if (!d || !Array.isArray(d.slots) || idx < 0 || idx >= d.slots.length) return null;
+    return d.slots[idx];
+  }
+
+  function findAssignmentByMatchId(j, matchId){
+    const arr = Array.isArray(j.assignments) ? j.assignments : [];
+    return arr.find(x => Number(x.match_id) === Number(matchId)) || null;
+  }
+
+  function clearDropMarks(){
+    document.querySelectorAll('.drop-ok,.drop-bad').forEach(el=>{
+      el.classList.remove('drop-ok','drop-bad');
+      el.removeAttribute('title');
+    });
+  }
+
+  async function movePreview(move, assignmentsOverride=null){
+    const url = `${API_LAB}?action=move_preview`;
+    const payload = {
+      stage_id: getStageId(),
+      assignments: assignmentsOverride || (lastJson?.assignments || []),
+      move
+    };
+    const res = await fetch(url, {
+      method:'POST',
+      credentials:'same-origin',
+      cache:'no-store',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify(payload)
+    });
+    return await safeJson(res);
+  }
+
+  function cloneAssignmentsFilteredOut(matchIds){
+    const set = new Set((matchIds||[]).map(x=>Number(x)));
+    const src = Array.isArray(lastJson?.assignments) ? lastJson.assignments : [];
+    return src.filter(a => a && !set.has(Number(a.match_id)));
+  }
+
+  function applyMoveLocally(matchId, to){
+    const a = findAssignmentByMatchId(lastJson, matchId);
+    if (!a) return false;
+    a.date = to.date;
+    a.slot_no = to.slot_no;
+    a.field_code = to.field_code;
+    const t = timeBySlot(lastJson, to.date, to.slot_no);
+    if (t) a.time = t;
+    return true;
+  }
+
+  // ---------------- stages ----------------
+  async function loadStages(){
+    $('status').textContent = 'загружаю этапы…';
+
+    const cur = await apiGet(API_CURRENT);
+    const currentStageId = cur?.stage?.id ? Number(cur.stage.id) : 0;
+
+    const j = await apiGet(API_STAGES);
+    if (!j.ok){
+      $('status').textContent = j.error || 'ошибка';
+      return;
+    }
+
+    const sel = $('stage_id');
+    sel.innerHTML = '';
+    for (const s of (j.stages || [])){
+      const opt = document.createElement('option');
+      opt.value = s.id;
+      opt.textContent = `${s.title || ('Этап #' + s.id)} (id=${s.id})`;
+      sel.appendChild(opt);
+    }
+
+    if (currentStageId){
+      sel.value = String(currentStageId);
+    }
+
+    $('status').textContent = 'готово';
+  }
+
+  // ---------------- render ----------------
+  function render(j){
+    const out = $('out');
+    out.innerHTML = '';
+
+    if (!j?.ok){
+      out.innerHTML = `<div class="uk-alert-danger" uk-alert><p>${esc(j?.error || 'ошибка')}</p></div>`;
+      return;
+    }
+
+    const coachConflicts = Array.isArray(j.coach_conflicts) ? j.coach_conflicts : (j.meta?.coach_conflicts || []);
+    if (coachConflicts.length){
+      const alert = document.createElement('div');
+      alert.className = 'uk-alert-warning uk-margin';
+      alert.setAttribute('uk-alert','');
+
+      const maxShow = 30;
+      const items = coachConflicts.slice(0, maxShow).map(c => {
+        const matches = (c.matches || []).map(m => `${esc(m.code)}<span class="muted">(${esc(m.field_code)})</span>`).join(', ');
+        return `<li><b>${esc(c.date)} ${esc(c.time)}</b> — ${esc(c.coach_name || ('coach#'+c.coach_id))}: ${matches}</li>`;
+      }).join('');
+      alert.innerHTML = `
+        <p><b>Конфликты тренеров:</b> ${esc(coachConflicts.length)} (показано до ${maxShow}).</p>
+        <div class="uk-text-small muted">Если развести невозможно — расписание всё равно строится, но конфликтные матчи подсвечены оранжевым.</div>
+        <ul class="uk-list uk-list-bullet uk-margin-small-top">${items}${coachConflicts.length>maxShow?'<li class="muted">…</li>':''}</ul>
+      `;
+      out.appendChild(alert);
+    }
+
+    const assignments = new Map();
+    for (const a of (j.assignments || [])){
+      assignments.set(`${a.date}|${a.time}|${a.field_code}`, a);
+    }
+
+    const tdData = (date, slotNo, field) => manualMode
+      ? ` data-date="${esc(date)}" data-slot="${Number(slotNo)}" data-field="${esc(field)}"`
+      : '';
+
+const wrapMatch = (a, codePrefix='') => {
+  const rawTitle = (a.title || a.label || a.code_view || a.code || '');
+  const label = esc(a.label || a.code_view || a.code || '');
+  const code  = esc(a.code_view || a.code || '');
+  const isCoachConflict = !!a.coach_conflict;
+  const warn = isCoachConflict ? ' ⚠' : '';
+  const dragAttr = manualMode ? ` draggable="true" data-mid="${Number(a.match_id)}"` : '';
+  const dragCls  = manualMode ? ' match-draggable' : '';
+  const prefix = codePrefix ? `<span class="muted">${esc(codePrefix)}:</span>` : '';
+
+  const coachIds = (a.coach_ids || []).map(x => Number(x || 0)).filter(Boolean);
+
+  let titleExtra = '';
+  let dotsHtml = '';
+
+  if (coachIds.length){
+    const c1 = _coachColor(coachIds[0]);
+    const c2 = coachIds.length > 1 ? _coachColor(coachIds[1]) : null;
+
+    if (c1) dotsHtml += `<span class="coach-dot" style="background:${c1.accent}"></span>`;
+    if (c2) dotsHtml += `<span class="coach-dot" style="background:${c2.accent}"></span>`;
+
+    const names = coachIds.slice(0,2).map(cid => coachNameById.get(cid) || ('coach#'+cid));
+    titleExtra = ` • Тренер: ${names.join(' / ')}`;
+  }
+
+  const title = esc(rawTitle + titleExtra);
+
+  return `<div class="match${dragCls}"${dragAttr} title="${title}">
+    ${dotsHtml}${prefix}<span class="code">${code}${warn}</span>
+    ${label && label !== code ? `<div class="small">${label}</div>` : ''}
+  </div>`;
+};
+
+
+
+    for (const d of (j.days || [])){
+      const card = document.createElement('div');
+      card.className = 'uk-card uk-card-default uk-card-body uk-margin';
+      const isReserved = (d.block === 'reserved');
+      if (isReserved) card.classList.add('reserved-card');
+
+      const head = document.createElement('div');
+      head.innerHTML = `
+        <div class="day-title">${esc(d.date)} • ${esc(d.start)}–${esc(d.end)} • полей: ${esc(d.fields)}${isReserved ? ' • <span class="uk-label uk-label-warning">РЕЗЕРВ ПОД ПЛЕЙ-ОФФ</span>' : ''}</div>
+        <div class="uk-text-small muted">шаг слота: ${esc(d.slot_minutes)} мин, последний слот: ${esc(d.last_slot_minutes)} мин • слотов: ${esc(d.slot_count)}</div>
+      `;
+      card.appendChild(head);
+
+      if (isReserved){
+        const msg = document.createElement('div');
+        msg.className = 'uk-text-small muted uk-margin-small-top';
+        msg.innerHTML = 'В этой фазе сюда ничего не ставим. Эти дни отрезаны под стыки/плей-офф.';
+        card.appendChild(msg);
+        out.appendChild(card);
+        continue;
+      }
+
+      const table = document.createElement('table');
+      table.className = 'uk-table uk-table-divider uk-table-small uk-margin';
+
+      const thead = document.createElement('thead');
+      const hr = document.createElement('tr');
+      hr.innerHTML = `<th style="width:90px">ВРЕМЯ</th>` + (d.cols || []).map(c => `<th class="uk-text-center">${esc(c)}</th>`).join('');
+      thead.appendChild(hr);
+      table.appendChild(thead);
+
+      const tbody = document.createElement('tbody');
+      const slots = (d.slots || []);
+      const slotsOob = (d.slots_oob || []);
+      for (let si = 0; si < slots.length; si++){
+        const t = slots[si];
+        const slotNo = si + 1;
+        const isOob = !!slotsOob[si];
+        const mode = (d.mode || ((d.cols||[]).length===2 ? 'pair' : 'single'));
+        const mixMode = String(j?.meta?.mix_12_34 || '').toUpperCase();
+        const showMix = (mixMode && mixMode !== 'OFF');
+
+        const tr = document.createElement('tr');
+        if (isOob) tr.classList.add('oob-row');
+        let htmlRow = `<td class="${isOob ? 'time' : 'muted'}">${esc(t)}</td>`;
+
+        for (const c of (d.cols || [])){
+          const a = assignments.get(`${d.date}|${t}|${c}`);
+          const data = tdData(d.date, slotNo, c);
+
+          if (!a){
+            htmlRow += `<td class="uk-text-center ${isOob ? 'empty' : 'muted'}"${data} data-mid="0">—</td>`;
+            continue;
+          }
+
+          const isCoachConflict = !!a.coach_conflict;
+          const cls = `uk-text-center cell${isCoachConflict ? ' coach-conflict' : ''}`;
+          htmlRow += `<td class="${cls}"${data} data-mid="${Number(a.match_id)}">${wrapMatch(a)}</td>`;
+        }
+        tr.innerHTML = htmlRow;
+        tbody.appendChild(tr);
+
+        if (!showMix) continue;
+
+        const getA = (fc) => assignments.get(`${d.date}|${t}|${fc}`);
+
+        if (mode === 'single'){
+          const a1 = getA('1');
+          const a2 = getA('2');
+          const a3 = getA('3');
+          const a4 = getA('4');
+          const a12 = getA('12');
+          const a34 = getA('34');
+
+          const half12Busy = !!(a1 || a2 || a12);
+          const half34Busy = !!(a3 || a4 || a34);
+
+          const shouldShow = !!(a12 || a34 || (half12Busy !== half34Busy));
+          if (!shouldShow) continue;
+
+          const sub = document.createElement('tr');
+          sub.className = 'subrow';
+
+          const cellPairHalf = (halfCode, pairA, leftA, rightA, leftLabel, rightLabel) => {
+            const data = tdData(d.date, slotNo, halfCode);
+            if (pairA){
+              const isCoachConflict = !!pairA.coach_conflict;
+              const cls = `uk-text-center cell${isCoachConflict ? ' coach-conflict' : ''}`;
+              return `<td colspan="2" class="${cls}"${data} data-mid="${Number(pairA.match_id)}">${wrapMatch(pairA, halfCode)}</td>`;
+            }
+            const busyList = [];
+            if (leftA) busyList.push(`${leftLabel}:${esc(leftA.code_view||leftA.code||'')}`);
+            if (rightA) busyList.push(`${rightLabel}:${esc(rightA.code_view||rightA.code||'')}`);
+            if (busyList.length){
+              const isCoachConflict = !!((leftA && leftA.coach_conflict) || (rightA && rightA.coach_conflict));
+              const cls = `uk-text-center half-busy${isCoachConflict ? ' coach-conflict' : ''}`;
+              return `<td colspan="2" class="${cls}"${data} data-mid="0">занято (${busyList.join(', ')})</td>`;
+            }
+            return `<td colspan="2" class="uk-text-center muted half-free"${data} data-mid="0">свободно</td>`;
+          };
+
+          let subHtml = `<td class="muted uk-text-small">↳ 12/34</td>`;
+          subHtml += cellPairHalf('12', a12, a1, a2, '1', '2');
+          subHtml += cellPairHalf('34', a34, a3, a4, '3', '4');
+          sub.innerHTML = subHtml;
+          tbody.appendChild(sub);
+
+        } else {
+          const a12 = getA('12');
+          const a34 = getA('34');
+          const a1 = getA('1');
+          const a2 = getA('2');
+          const a3 = getA('3');
+          const a4 = getA('4');
+
+          const hasSingles = !!(a1 || a2 || a3 || a4);
+          if (!hasSingles) continue;
+
+          const sub = document.createElement('tr');
+          sub.className = 'subrow';
+
+          const cellSinglesHalf = (halfCode, pairA, leftA, rightA, leftLabel, rightLabel) => {
+            const data = tdData(d.date, slotNo, halfCode);
+            if (pairA){
+              return `<td class="uk-text-center muted"${data} data-mid="${Number(pairA.match_id)}">занято парой</td>`;
+            }
+            const list = [];
+            if (leftA) list.push(`${leftLabel}:${esc(leftA.code_view||leftA.code||'')}`);
+            if (rightA) list.push(`${rightLabel}:${esc(rightA.code_view||rightA.code||'')}`);
+            if (!list.length) return `<td class="uk-text-center muted"${data} data-mid="0">—</td>`;
+            const isCoachConflict = !!((leftA && leftA.coach_conflict) || (rightA && rightA.coach_conflict));
+            const cls = `uk-text-center cell${isCoachConflict ? ' coach-conflict' : ''}`;
+            return `<td class="${cls}"${data} data-mid="0"><span class="code">${list.join(' • ')}</span></td>`;
+          };
+
+          let subHtml = `<td class="muted uk-text-small">↳ 1–4</td>`;
+          for (const c of (d.cols || [])){
+            if (String(c) === '12') subHtml += cellSinglesHalf('12', a12, a1, a2, '1', '2');
+            else if (String(c) === '34') subHtml += cellSinglesHalf('34', a34, a3, a4, '3', '4');
+            else subHtml += `<td class="uk-text-center muted">—</td>`;
+          }
+
+          sub.innerHTML = subHtml;
+          tbody.appendChild(sub);
+        }
+      }
+
+      table.appendChild(tbody);
+      card.appendChild(table);
+
+      const un = document.createElement('div');
+      const unplaced = (j.unplaced || []).filter(x => x && x.code);
+      const oobCount = (typeof d.oob_count === 'number') ? d.oob_count : ((d.slots_oob || []).reduce((s,x)=>s+(x?1:0),0));
+      if (unplaced.length){
+        un.className = 'uk-alert-warning unplaced';
+        un.setAttribute('uk-alert','');
+        un.innerHTML = `<p>Не влезло: <b>${unplaced.length}</b> матч(ей). Пример: ${esc(unplaced.slice(0,8).map(x=>x.code).join(', '))}${unplaced.length>8?'…':''}</p>`;
+      } else if (oobCount){
+        un.className = 'uk-alert-danger unplaced';
+        un.setAttribute('uk-alert','');
+        un.innerHTML = `<p><b>ВНИМАНИЕ:</b> есть <b>${oobCount}</b> слот(а) <b>вне диапазона дня</b> — подсвечены красным.</p>`;
+      } else {
+        un.className = 'uk-text-small muted';
+        un.textContent = 'Все матчи влезли в сетку (по текущим правилам/приоритетам).';
+      }
+      card.appendChild(un);
+
+      out.appendChild(card);
+    }
+  }
+
+  // ---------------- build + copy ----------------
+  async function build(){
+    const stageId = getStageId();
+    if (!stageId){
+      $('status').textContent = 'выбери этап';
+      UIkit.notification('Выбери этап', {status:'warning'});
+      return;
+    }
+
+    const url = buildUrl();
+    $('status').textContent = 'считаю…';
+
+    const j = await apiGet(url);
+    lastJson = j;
+
+    await ensureCoachPalette(stageId);
+
+    if (!j.ok){
+      $('status').textContent = j.error || 'ошибка';
+    } else {
+      $('status').textContent = `готово (матчей: ${j.meta?.matches_total ?? '—'}, размещено: ${j.meta?.placed ?? '—'})`;
+    }
+
+    clearDropMarks();
+    render(j);
+    await applyConstraintHighlights();
+  }
+
+  async function copyJson(){
+    if (!lastJson){
+      UIkit.notification('Сначала нажми «ПОСТРОИТЬ».', {status:'warning'});
+      return;
+    }
+    try{
+      await navigator.clipboard.writeText(JSON.stringify(lastJson, null, 2));
+      UIkit.notification('JSON скопирован.', {status:'success'});
+    }catch(e){
+      UIkit.notification('Не смог скопировать (браузер запретил).', {status:'danger'});
+    }
+  }
+
+  async function saveToDb(){
+    const stageId = getStageId();
+    if (!stageId){
+      UIkit.notification("Выбери этап", {status:"warning"});
+      return;
+    }
+    if (!lastJson || !lastJson.ok){
+      UIkit.notification("Сначала нажми «ПОСТРОИТЬ».", {status:"warning"});
+      return;
+    }
+    const assigns = (lastJson.assignments || []).filter(a => a && Number(a.match_id || 0) > 0);
+    if (!assigns.length){
+      UIkit.notification("Нет назначений для сохранения.", {status:"warning"});
+      return;
+    }
+
+    const btn = $('btn_save');
+    if (btn) btn.disabled = true;
+
+    try{
+      const res = await apiPostJson(API_SCHEDULE_SAVE, { stage_id: stageId, assignments: assigns });
+      if (!res.ok) throw new Error(res.error || "save failed");
+      UIkit.notification('Сохранено: ' + (res.saved || 0) + ' назначений', {status:'success'});
+    }catch(e){
+      console.error(e);
+      UIkit.notification("Ошибка сохранения: " + (e.message || e), {status:"danger"});
+    }finally{
+      if (btn) btn.disabled = false;
+    }
+  }
+
+  // ---------------- init bindings ----------------
+  function bindUI(){
+    $('btn_build')?.addEventListener('click', (e)=>{ e.preventDefault(); build(); });
+    $('btn_copy')?.addEventListener('click', (e)=>{ e.preventDefault(); copyJson(); });
+
+    $('btn_save')?.addEventListener('click', (e)=>{ e.preventDefault(); saveToDb(); });
+
+    // constraints modal
+    $('btnConstraints')?.addEventListener('click', (e)=>{ e.preventDefault(); constraintsOpenModal(); });
+    $('cSave')?.addEventListener('click', (e)=>{ e.preventDefault(); constraintsSave(); });
+
+    bindConstraintDayControls();
+
+    // manual toggle
+    $('manual_mode')?.addEventListener('change', (e)=>{
+      manualMode = !!e.target.checked;
+      dragMatchId = 0;
+      lastDropCell = null;
+      clearDropMarks();
+      if (lastJson?.ok) render(lastJson);
+    });
+
+    // DnD (delegated)
+    $('out')?.addEventListener('dragstart', (e)=>{
+      const el = e.target.closest('.match-draggable');
+      if (!manualMode || !el) return;
+      dragMatchId = Number(el.dataset.mid || 0);
+      if (!dragMatchId) return;
+      e.dataTransfer.effectAllowed = 'move';
+    });
+
+    $('out')?.addEventListener('dragover', (e)=>{
+      if (!manualMode || !dragMatchId || !lastJson?.ok) return;
+      const td = e.target.closest('td[data-date][data-slot][data-field]');
+      if (!td) return;
+
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'move';
+
+      if (lastDropCell === td) return;
+      lastDropCell = td;
+
+      const to = {
+        date: td.dataset.date,
+        slot_no: Number(td.dataset.slot),
+        field_code: td.dataset.field
+      };
+
+      debounce(async ()=>{
+        clearDropMarks();
+
+        const targetMid = Number(td.dataset.mid || 0);
+        const r = await movePreview({ match_id: dragMatchId, to });
+
+        if (r?.ok){
+          td.classList.add('drop-ok');
+          td.title = targetMid ? 'Можно (swap возможен)' : 'Можно поставить';
+        } else {
+          td.classList.add('drop-bad');
+          const msg = (r?.reasons || []).map(x => x.msg || x.code).join('; ') || (r?.error || 'Нельзя');
+          td.title = msg;
+        }
+      }, 180);
+    });
+
+    $('out')?.addEventListener('drop', async (e)=>{
+      if (!manualMode || !dragMatchId || !lastJson?.ok) return;
+      const td = e.target.closest('td[data-date][data-slot][data-field]');
+      if (!td) return;
+
+      e.preventDefault();
+
+      const to = {
+        date: td.dataset.date,
+        slot_no: Number(td.dataset.slot),
+        field_code: td.dataset.field
+      };
+
+      const srcA = findAssignmentByMatchId(lastJson, dragMatchId);
+      if (!srcA){
+        UIkit.notification('Не нашёл исходный assignment для match_id=' + dragMatchId, {status:'warning'});
+        return;
+      }
+      const from = { date: srcA.date, slot_no: Number(srcA.slot_no), field_code: String(srcA.field_code) };
+
+      const targetMid = Number(td.dataset.mid || 0);
+
+      // 1) simple move
+      if (!targetMid){
+        const r = await movePreview({ match_id: dragMatchId, to });
+        if (!r?.ok){
+          const msg = (r?.reasons || []).map(x => x.msg || x.code).join('\n') || (r?.error || 'Нельзя');
+          UIkit.notification(msg, {status:'danger'});
+          return;
+        }
+        applyMoveLocally(dragMatchId, to);
+        dragMatchId = 0;
+        lastDropCell = null;
+        clearDropMarks();
+        render(lastJson);
+        await applyConstraintHighlights();
+        UIkit.notification('Перенесено.', {status:'success'});
+        return;
+      }
+
+      // 2) swap
+      if (targetMid === dragMatchId){
+        dragMatchId = 0;
+        clearDropMarks();
+        return;
+      }
+
+      const ok = confirm(`Ячейка занята. Сделать SWAP?\n${dragMatchId} ⇄ ${targetMid}`);
+      if (!ok) return;
+
+      const assignNoTarget = cloneAssignmentsFilteredOut([targetMid]);
+      const r1 = await movePreview({ match_id: dragMatchId, to }, assignNoTarget);
+
+      const assignNoDrag = cloneAssignmentsFilteredOut([dragMatchId]);
+      const r2 = await movePreview({ match_id: targetMid, to: from }, assignNoDrag);
+
+      if (!r1?.ok || !r2?.ok){
+        const msg1 = r1?.ok ? '' : ('\n• ' + (r1?.reasons||[]).map(x=>x.msg||x.code).join('; '));
+        const msg2 = r2?.ok ? '' : ('\n• ' + (r2?.reasons||[]).map(x=>x.msg||x.code).join('; '));
+        UIkit.notification('SWAP невозможен:' + msg1 + msg2, {status:'danger'});
+        return;
+      }
+
+      applyMoveLocally(dragMatchId, to);
+      applyMoveLocally(targetMid, from);
+
+      dragMatchId = 0;
+      lastDropCell = null;
+      clearDropMarks();
+      render(lastJson);
+      await applyConstraintHighlights();
+      UIkit.notification('SWAP выполнен.', {status:'success'});
+    });
+  }
+
+  // ---------------- boot ----------------
+  function boot(){
+    loadStages()
+      .then(()=>{
+        bindUI();
+      })
+      .catch(err=>{
+        console.error(err);
+        $('status').textContent = 'ошибка загрузки';
+      });
+  }
+
+  if (document.readyState === 'loading'){
+    document.addEventListener('DOMContentLoaded', boot);
+  } else {
+    boot();
+  }
+})();
+</script>
+
+</body>
+</html>

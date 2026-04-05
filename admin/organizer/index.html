@@ -1,0 +1,485 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>LazaCup — Organizer</title>
+
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/uikit@3/dist/css/uikit.min.css">
+  <link rel="stylesheet" href="/admin/_admin.css?v=4">
+
+  <script src="https://cdn.jsdelivr.net/npm/uikit@3/dist/js/uikit.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/uikit@3/dist/js/uikit-icons.min.js"></script>
+</head>
+<body>
+
+<header class="uk-navbar-container uk-navbar-transparent" uk-navbar>
+  <div class="uk-navbar-left uk-padding-small">
+    <div class="uk-flex uk-flex-middle uk-grid-small" uk-grid>
+      <div><div class="logo">LC</div></div>
+      <div>
+        <div class="uk-text-bold">LazaCup Admin</div>
+        <div class="uk-text-small uk-text-muted">Панель организатора</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="uk-navbar-right uk-padding-small">
+    <div class="uk-flex uk-flex-middle uk-grid-small" uk-grid>
+      <div class="uk-text-small uk-text-muted uk-margin-right" id="who"></div>
+      <button id="btnLogout" class="uk-button uk-button-default" type="button">
+        <span uk-icon="sign-out"></span> Выйти
+      </button>
+    </div>
+  </div>
+</header>
+
+<div class="uk-container uk-container-large uk-margin-large-top">
+<div class="uk-card uk-card-default uk-card-body uk-box-shadow-small">
+  <h3 class="uk-margin-remove-top">Быстрые действия</h3>
+
+  <div class="uk-child-width-1-3@m uk-grid-small uk-grid-match" uk-grid>
+
+    <div>
+      <a class="uk-card uk-card-default uk-card-body uk-link-toggle uk-display-block uk-height-1-1"
+         href="/admin/organizer/tournaments.html">
+        <div class="uk-text-bold">Турниры</div>
+        <div class="uk-text-small uk-text-muted">название + дата создания</div>
+      </a>
+    </div>
+
+    <div>
+      <a class="uk-card uk-card-default uk-card-body uk-link-toggle uk-display-block uk-height-1-1"
+         href="/admin/organizer/stages.html">
+        <div class="uk-text-bold">Этапы</div>
+        <div class="uk-text-small uk-text-muted">даты, тайминги, параметры</div>
+      </a>
+    </div>
+
+    <div>
+      <a class="uk-card uk-card-default uk-card-body uk-link-toggle uk-display-block uk-height-1-1"
+         href="/admin/organizer/stage-categories.html">
+        <div class="uk-text-bold">Категории этапа</div>
+        <div class="uk-text-small uk-text-muted">годы + длительность матчей</div>
+      </a>
+    </div>
+
+    <div>
+      <a class="uk-card uk-card-default uk-card-body uk-link-toggle uk-display-block uk-height-1-1"
+         href="/admin/organizer/field-rules.html">
+        <div class="uk-text-bold">Поля этапа</div>
+        <div class="uk-text-small uk-text-muted">правила распределения полей</div>
+      </a>
+    </div>
+
+    <div>
+      <a class="uk-card uk-card-default uk-card-body uk-link-toggle uk-display-block uk-height-1-1"
+         href="/admin/organizer/squads-import.html">
+        <div class="uk-text-bold">Команды этапа</div>
+        <div class="uk-text-small uk-text-muted">импорт CSV, тренеры, рейтинг</div>
+      </a>
+    </div>
+
+    <div>
+      <a class="uk-card uk-card-default uk-card-body uk-link-toggle uk-display-block uk-height-1-1"
+         href="/admin/organizer/groups.html">
+        <div class="uk-text-bold">Группы этапа</div>
+        <div class="uk-text-small uk-text-muted">распределение команд по группам</div>
+      </a>
+    </div>
+
+    <div>
+      <a class="uk-card uk-card-default uk-card-body uk-link-toggle uk-display-block uk-height-1-1"
+         href="/admin/organizer/playoff.html">
+        <div class="uk-text-bold">Плей-офф этапа</div>
+        <div class="uk-text-small uk-text-muted">распределение команд по стыковым матчам</div>
+      </a>
+    </div>
+
+    <div>
+      <a class="uk-card uk-card-default uk-card-body uk-link-toggle uk-display-block uk-height-1-1"
+         href="/admin/organizer/schedule.html">
+        <div class="uk-text-bold">Расписание</div>
+        <div class="uk-text-small uk-text-muted">дни турнира (окно времени, поля)</div>
+      </a>
+    </div>
+
+    <div>
+      <a class="uk-card uk-card-primary uk-card-body uk-link-toggle uk-display-block uk-height-1-1"
+         href="/admin/operator/">
+        <div class="uk-text-bold">ОПЕРАТОР</div>
+        <div class="uk-text-small uk-text-muted">работа с текущим турниром</div>
+      </a>
+    </div>
+
+  </div>
+</div>
+
+    <!-- System control -->
+  <div class="uk-card uk-card-default uk-card-body uk-box-shadow-small uk-margin-top" id="diagCard">
+    <div class="uk-flex uk-flex-between uk-flex-middle uk-flex-wrap">
+      <div>
+        <div class="uk-flex uk-flex-middle uk-grid-small" uk-grid>
+          <div>
+            <div class="uk-text-bold">Контроль системы</div>
+          </div>
+
+          <div>
+            <span id="diagBadge" class="uk-label">ПРОВЕРКА</span>
+          </div>
+          <div class="uk-text-small uk-text-muted" id="diagCardLine">
+            Текущий этап: —
+          </div>
+        </div>
+
+        <div class="uk-text-meta uk-margin-small-top" id="diagCardMeta">
+          Статус: загрузка…
+        </div>
+      </div>
+
+      <div>
+        <a href="/admin/organizer/diagnostics.html"
+           id="btnDiagnostics"
+           class="uk-button uk-button-default">
+          <span uk-icon="search"></span> Диагностика
+        </a>
+      </div>
+    </div>
+  </div>
+
+  <!-- Stage summary -->
+  <div class="uk-card uk-card-default uk-card-body uk-box-shadow-small uk-margin-top" id="summaryCard">
+    <div class="uk-flex uk-flex-middle uk-flex-between uk-flex-wrap">
+      <div>
+        <div class="uk-text-bold">Сводка этапа</div>
+        <div class="uk-text-small uk-text-muted" id="summaryLine">
+          Расчёт матчей по текущему этапу
+        </div>
+        <div class="uk-text-meta uk-margin-small-top" id="summaryMeta">
+          Загрузка…
+        </div>
+      </div>
+
+      <div>
+        <button id="btnSummaryRefresh" class="uk-button uk-button-default" type="button">
+          <span uk-icon="refresh"></span> Обновить
+        </button>
+      </div>
+    </div>
+
+    <div class="uk-margin-top uk-overflow-auto" id="summaryTableWrap"></div>
+  </div>
+
+  <!-- Snapshot monitor -->
+  <div class="uk-card uk-card-default uk-card-body uk-box-shadow-small uk-margin-top">
+    <div class="uk-flex uk-flex-middle uk-flex-between uk-flex-wrap">
+      <div>
+        <div class="uk-text-bold">Snapshot’ы публикаций</div>
+        <div class="uk-text-small uk-text-muted" id="snapLine">Загрузка…</div>
+        <div class="uk-text-meta uk-margin-small-top" id="snapMeta"></div>
+      </div>
+
+      <div class="uk-flex uk-flex-middle uk-grid-small" uk-grid>
+        <button id="btnSnapRefresh" class="uk-button uk-button-default" type="button">
+          <span uk-icon="refresh"></span> Обновить
+        </button>
+        <button id="btnSnapCleanup" class="uk-button uk-button-danger" type="button" disabled>
+          <span uk-icon="trash"></span> Очистить старые
+        </button>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script src="/admin/_admin.js?v=4"></script>
+<script>
+  Admin.initAdminHeader('organizer');
+
+  const API_SNAP_STATUS = '/api/tournament/snapshots_status.php';
+  const API_SNAP_CLEAN  = '/api/tournament/snapshots_cleanup_now.php';
+  const API_CURRENT     = '/api/tournament/current.php';
+  const API_DIAG        = '/api/tournament/schedule_integrity_check.php';
+  const API_STAGE_SUMMARY = '/api/tournament/stage_match_summary.php';
+
+  function notify(msg, status='primary') {
+    UIkit.notification({message: msg, status, pos:'top-right', timeout: 2500});
+  }
+
+  async function apiGet(url) {
+    const r = await fetch(url, {credentials:'same-origin'});
+    if (r.status === 401) { location.href = '/admin/login.html'; return null; }
+    const j = await r.json().catch(() => null);
+    if (!j || j.ok !== true) throw new Error((j && j.error) ? j.error : 'API error');
+    return j;
+  }
+
+  async function apiPost(url, data) {
+    const r = await fetch(url, {
+      method:'POST',
+      credentials:'same-origin',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify(data || {})
+    });
+    if (r.status === 401) { location.href = '/admin/login.html'; return null; }
+    const j = await r.json().catch(() => null);
+    if (!j || j.ok !== true) throw new Error((j && j.error) ? j.error : 'API error');
+    return j;
+  }
+
+  function fmtLastCleanup(at, removed) {
+    if (!at) return 'Последняя очистка: —';
+    return `Последняя очистка: ${at} · удалено: ${removed}`;
+  }
+
+function setDiagCardState(kind, line, meta) {
+  const card   = document.getElementById('diagCard');
+  const lineEl = document.getElementById('diagCardLine');
+  const metaEl = document.getElementById('diagCardMeta');
+  const badge  = document.getElementById('diagBadge');
+
+  if (!card || !lineEl || !metaEl || !badge) return;
+
+  card.classList.remove('uk-card-default', 'uk-card-secondary', 'uk-card-danger');
+
+  badge.className = 'uk-label';
+
+  if (kind === 'ok') {
+    card.classList.add('uk-card-default');
+    badge.classList.add('uk-label-success');
+    badge.textContent = 'OK';
+  } else if (kind === 'warn') {
+    card.classList.add('uk-card-secondary');
+    badge.classList.add('uk-label-warning');
+    badge.textContent = 'ВНИМАНИЕ';
+  } else if (kind === 'danger') {
+    card.classList.add('uk-card-danger');
+    badge.classList.add('uk-label-danger');
+    badge.textContent = 'ОШИБКА';
+  } else if (kind === 'idle') {
+    card.classList.add('uk-card-default');
+    badge.textContent = 'ПРОВЕРКА';
+  } else if (kind === 'empty') {
+    card.classList.add('uk-card-default');
+    badge.textContent = 'НЕТ ЭТАПА';
+  } else {
+    card.classList.add('uk-card-default');
+    badge.textContent = 'СТАТУС';
+  }
+
+  lineEl.textContent = line || 'Текущий этап: —';
+  metaEl.textContent = meta || '';
+}
+
+async function loadDiagnosticsStatus() {
+  setDiagCardState('idle', 'Текущий этап: —', 'Статус: загрузка…');
+
+  try {
+    const cur = await apiGet(API_CURRENT);
+
+    if (!cur || !cur.stage) {
+      setDiagCardState('empty', 'Текущий этап не выбран', 'Статус: проверка недоступна');
+      return;
+    }
+
+    const stage = cur.stage;
+    const diag = await apiGet(API_DIAG + '?stage_id=' + encodeURIComponent(stage.id));
+    const s = diag.summary || {};
+    const total = Number(diag.total_problems || 0);
+
+    const line = `Текущий этап: ${stage.name} #${stage.id}`;
+
+    if (!total) {
+      setDiagCardState('ok', line, 'Проблем не найдено');
+      return;
+    }
+
+    const orphanCount =
+      (s.schedule_items_orphans || 0) +
+      (s.schedule_orphans || 0) +
+      (s.results_orphans || 0);
+
+    const conflictCount =
+      (s.team_conflicts || 0) +
+      (s.coach_conflicts || 0);
+
+    setDiagCardState(
+      'warn',
+      line,
+      `Проблем: ${total} · слоты: ${s.slot_duplicates || 0} · матчи: ${s.match_duplicates || 0} · сироты: ${orphanCount} · конфликты: ${conflictCount}`
+    );
+
+  } catch (e) {
+    console.error(e);
+    setDiagCardState('danger', 'Контроль системы', 'Ошибка проверки: ' + (e.message || e));
+  }
+}
+
+  function esc(s) {
+    return String(s == null ? '' : s)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;');
+  }
+
+  function renderStageSummaryTable(rows, summary) {
+    if (!rows || !rows.length) {
+      return '<div class="uk-text-muted">В текущем этапе пока нет команд.</div>';
+    }
+
+    let html = '';
+    html += `
+      <table class="uk-table uk-table-small uk-table-divider uk-table-middle">
+        <thead>
+          <tr>
+            <th>Кат.</th>
+            <th class="uk-text-center">Команд</th>
+            <th>Формат</th>
+            <th class="uk-text-center">Группа</th>
+            <th class="uk-text-center">ПО</th>
+            <th class="uk-text-center">Всего</th>
+            <th class="uk-text-center">Мин. игр</th>
+            <th>Примечание</th>
+          </tr>
+        </thead>
+        <tbody>
+    `;
+
+    rows.forEach(r => {
+      html += `
+        <tr>
+          <td><b>${esc(r.category)}</b></td>
+          <td class="uk-text-center">${esc(r.teams)}</td>
+          <td>${esc(r.format)}</td>
+          <td class="uk-text-center">${esc(r.group_matches)}</td>
+          <td class="uk-text-center">${esc(r.playoff_matches)}</td>
+          <td class="uk-text-center"><b>${esc(r.total_matches)}</b></td>
+          <td class="uk-text-center">${esc(r.team_min_matches)}</td>
+          <td>${esc(r.note || '')}</td>
+        </tr>
+      `;
+    });
+
+    html += `
+        </tbody>
+        <tfoot>
+          <tr>
+            <th>ИТОГО</th>
+            <th class="uk-text-center">${esc(summary.teams || 0)}</th>
+            <th>${esc((summary.categories || 0) + ' категорий')}</th>
+            <th class="uk-text-center">${esc(summary.group_matches || 0)}</th>
+            <th class="uk-text-center">${esc(summary.playoff_matches || 0)}</th>
+            <th class="uk-text-center"><b>${esc(summary.total_matches || 0)}</b></th>
+            <th class="uk-text-center">—</th>
+            <th>${summary.days_count ? ('~ ' + esc(summary.avg_per_day) + ' матч./день') : ''}</th>
+          </tr>
+        </tfoot>
+      </table>
+    `;
+
+    return html;
+  }
+
+  async function loadStageSummary() {
+    const line = document.getElementById('summaryLine');
+    const meta = document.getElementById('summaryMeta');
+    const wrap = document.getElementById('summaryTableWrap');
+
+    line.textContent = 'Расчёт матчей по текущему этапу';
+    meta.textContent = 'Загрузка…';
+    wrap.innerHTML = '';
+
+    const cur = await apiGet(API_CURRENT);
+    if (!cur || !cur.stage) {
+      line.textContent = 'Текущий этап не выбран';
+      meta.textContent = 'Сводка недоступна';
+      wrap.innerHTML = '<div class="uk-text-muted">Выбери текущий этап, чтобы увидеть сводку.</div>';
+      return;
+    }
+
+    const stage = cur.stage;
+    const j = await apiGet(API_STAGE_SUMMARY + '?stage_id=' + encodeURIComponent(stage.id));
+
+    const s = j.summary || {};
+    const rows = j.rows || [];
+
+    line.textContent = `Текущий этап: ${stage.name} #${stage.id}`;
+    meta.textContent = `Команд: ${s.teams || 0} · Категорий: ${s.categories || 0} · Матчей всего: ${s.total_matches || 0}` +
+      (s.days_count ? ` · Дней: ${s.days_count} · ~ ${s.avg_per_day} матч./день` : '');
+
+    wrap.innerHTML = renderStageSummaryTable(rows, s);
+  }
+
+  async function loadSnapshotsStatus() {
+    const line = document.getElementById('snapLine');
+    const meta = document.getElementById('snapMeta');
+    const btnClean = document.getElementById('btnSnapCleanup');
+
+    line.textContent = 'Загрузка…';
+    meta.textContent = '';
+    btnClean.disabled = true;
+
+    const j = await apiGet(API_SNAP_STATUS);
+    const d = (j && j.data) ? j.data : null;
+    if (!d) throw new Error('Bad response');
+
+    line.textContent = `Активных snapshot’ов: ${d.count} (храним ${d.keep_days} дней)`;
+    meta.textContent = fmtLastCleanup(d.last_cleanup_at, d.last_cleanup_removed);
+
+    // если очистка не делалась давно — подсветим (просто текстом)
+    // (без парсинга дат усложнять не будем)
+    btnClean.disabled = false;
+  }
+
+  (async function(){
+    const user = await Admin.requireRole(['organizer']);
+    if (!user) return;
+
+    document.getElementById('who').textContent = user.login + ' • ' + user.role;
+    document.getElementById('btnLogout').addEventListener('click', () => Admin.logout());
+
+    document.getElementById('btnSnapRefresh').addEventListener('click', async () => {
+      try { await loadSnapshotsStatus(); notify('Обновлено', 'success'); }
+      catch(e){ notify(e.message || 'Ошибка', 'danger'); console.error(e); }
+    });
+
+    document.getElementById('btnSummaryRefresh').addEventListener('click', async () => {
+      try {
+        await loadStageSummary();
+        notify('Сводка обновлена', 'success');
+      } catch(e) {
+        notify(e.message || 'Ошибка сводки', 'danger');
+        console.error(e);
+      }
+    });
+
+    document.getElementById('btnSnapCleanup').addEventListener('click', async () => {
+      const ok = confirm('Очистить устаревшие snapshot’ы?');
+      if (!ok) return;
+
+      try {
+        const r = await apiPost(API_SNAP_CLEAN, {});
+        const d = r.data || {};
+        notify(`Очистка выполнена. Удалено: ${d.removed || 0}`, 'success');
+        await loadSnapshotsStatus();
+      } catch(e) {
+        notify(e.message || 'Ошибка очистки', 'danger');
+        console.error(e);
+      }
+    });
+
+    try { await loadSnapshotsStatus(); }
+    catch(e){ notify(e.message || 'Ошибка snapshot’ов', 'danger'); console.error(e); }
+
+    try { await loadDiagnosticsStatus(); }
+    catch(e){ notify(e.message || 'Ошибка диагностики', 'danger'); console.error(e); }
+
+    try { await loadStageSummary(); }
+    catch(e){ notify(e.message || 'Ошибка сводки этапа', 'danger'); console.error(e); }
+
+  })();
+</script>
+
+</body>
+</html>

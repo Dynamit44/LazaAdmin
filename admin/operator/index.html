@@ -1,0 +1,163 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>LazaCup — Operator</title>
+
+   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/uikit@3/dist/css/uikit.min.css">
+  <link rel="stylesheet" href="/admin/_admin.css?v=4">
+
+  <script src="https://cdn.jsdelivr.net/npm/uikit@3/dist/js/uikit.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/uikit@3/dist/js/uikit-icons.min.js"></script>
+   <script src="/admin/_admin.js?v=4" defer></script>
+   <script>
+     document.addEventListener('DOMContentLoaded', () => {
+       Admin.initAdminHeader('organizer','operator');
+     });
+   </script>
+
+</head>
+<body>
+
+<header class="lc-admin-header">
+  <div class="uk-container uk-container-expand">
+    <nav class="uk-navbar-container uk-navbar-transparent" uk-navbar>
+      <div class="uk-navbar-left">
+        <a class="uk-navbar-item uk-logo" href="/admin/operator/">
+          <span class="lc-logo">LC</span>
+          <span class="uk-margin-small-left">LazaCup</span>
+          <span class="lc-operator-badge">оператор</span>
+        </a>
+
+        <ul class="uk-navbar-nav uk-visible@m" id="adminNav">
+          <!-- <li><a class="uk-disabled" href="/admin/operator/index.html">Оператор</a></li> -->
+          <li><a href="/admin/operator/board.html">Шахматка</a></li>
+          <li><a href="/admin/operator/schedule.html">Расписание</a></li>
+          <li><a href="/admin/operator/publish.html">Публикация</a></li>
+        </ul>
+
+      </div>
+      <div class="uk-navbar-right">
+        <div class="uk-navbar-item uk-visible@m">
+          <span class="uk-text-small uk-text-muted">Вы:</span>
+          <span id="adminUser" class="uk-text-small uk-margin-small-left">—</span>
+        </div>
+
+        <div data-show-for="organizer" class="uk-navbar-item">
+            <a class="uk-navbar-toggle" uk-toggle="target: #adminOffcanvas" href="#">
+               <span uk-navbar-toggle-icon></span>
+            </a>
+            <div id="adminOffcanvas" uk-offcanvas="overlay: true">
+               <div class="uk-offcanvas-bar">
+                 <button class="uk-offcanvas-close" type="button" uk-close></button>
+                 <ul class="uk-nav uk-nav-default" id="adminNavMobile">
+                   <li><a href="/admin/organizer">Админ</a></li>
+                   <li><a href="/admin/organizer/tournaments.html">Турниры</a></li>
+                   <li><a href="/admin/organizer/stages.html">Этапы</a></li>
+                   <li><a href="/admin/organizer/stage-categories.html">Категории</a></li>
+                   <li><a href="/admin/organizer/field-rules.html">Поля</a></li>
+                   <li><a href="/admin/organizer/squads-import.html">Команды</a></li>
+                   <li><a href="/admin/organizer/groups.html">Группы</a></li>
+                   <li><a href="/admin/organizer/playoff.html">Плей-офф</a></li>
+                   <li><a href="/admin/organizer/schedule.html">Расписание</a></li>
+                 </ul>
+               </div>
+            </div>
+         </div>
+
+        <div class="uk-navbar-item">
+          <button id="btnLogout" class="uk-button uk-button-default" type="button">
+            <span uk-icon="sign-out"></span> Выйти
+          </button>
+        </div>
+    </nav>
+  </div>
+</header>
+
+<div class="uk-container uk-container-large uk-margin-large-top">
+
+  <div class="uk-card uk-card-default uk-card-body">
+    <h3 class="uk-margin-remove">Текущие настройки</h3>
+    <div class="uk-text-small uk-text-muted uk-margin-small-bottom">
+      Это читается из /api/tournament/current.php
+    </div>
+
+    <div id="curBox" class="uk-margin"></div>
+
+    <div class="uk-alert uk-alert-primary" uk-alert>
+      Дальше сюда повесим кнопки оператора (расписание, таблицы, печать и т.д.). Сейчас главное — чтобы оператор видел “какой турнир/этап активен”.
+    </div>
+
+  </div>
+
+</div>
+
+<script>
+(function(){
+  const API_CURRENT = '/api/tournament/current.php';
+  const box = document.getElementById('curBox');
+
+  function escapeHtml(s) {
+    return String(s).replace(/[&<>"']/g, m => ({
+      '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'
+    }[m]));
+  }
+
+  function show(html) {
+    box.innerHTML = html;
+  }
+
+  async function load() {
+    const res = await fetch(API_CURRENT, {credentials:'same-origin'});
+    const txt = await res.text();
+    let j = null;
+    try { j = JSON.parse(txt); } catch(e) {}
+
+    if (!res.ok || !j || !j.ok) {
+      show(`<div class="uk-alert uk-alert-danger" uk-alert><b>Ошибка</b><br>${escapeHtml(j?.error || txt || ('HTTP ' + res.status))}</div>`);
+      return;
+    }
+
+    if (!j.tournament) {
+      show(`<div class="uk-alert uk-alert-warning" uk-alert><b>Не назначен текущий турнир</b><br>Поставь галочку “Текущий” в турнирах.</div>`);
+      return;
+    }
+
+    const t = j.tournament;
+    const s = j.stage;
+
+    let html = `<div class="uk-grid-small" uk-grid>
+      <div class="uk-width-1-2@m">
+        <div class="uk-card uk-card-default uk-card-body">
+          <div class="uk-text-meta">Текущий турнир</div>
+          <div class="uk-text-bold uk-text-large">${escapeHtml(t.name || '')}</div>
+          <div class="uk-text-small uk-text-muted">ID: ${escapeHtml(t.id || '')}</div>
+        </div>
+      </div>
+      <div class="uk-width-1-2@m">
+        <div class="uk-card uk-card-default uk-card-body">
+          <div class="uk-text-meta">Текущий этап</div>`;
+
+    if (!s) {
+      html += `<div class="uk-text-bold uk-text-large">—</div>
+               <div class="uk-text-small uk-text-muted">Не назначен текущий этап</div>`;
+    } else {
+      html += `<div class="uk-text-bold uk-text-large">${escapeHtml(s.name || '')}</div>
+               <div class="uk-text-small uk-text-muted">ID: ${escapeHtml(s.id || '')}</div>
+               <div class="uk-text-small uk-text-muted">${escapeHtml(s.start_date || '')} — ${escapeHtml(s.end_date || '')}</div>`;
+      if (Number(j.stage_fallback || 0) === 1) {
+        html += `<div class="uk-text-small uk-text-warning uk-margin-small-top">Внимание: текущий этап не назначен, показан последний этап (fallback).</div>`;
+      }
+    }
+
+    html += `</div></div></div>`;
+    show(html);
+  }
+
+  load().catch(e => show(`<div class="uk-alert uk-alert-danger" uk-alert>${escapeHtml(e.message || 'Ошибка')}</div>`));
+})();
+</script>
+
+</body>
+</html>

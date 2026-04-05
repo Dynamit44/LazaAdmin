@@ -1,0 +1,474 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>LazaCup — Турниры</title>
+
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/uikit@3/dist/css/uikit.min.css">
+  <link rel="stylesheet" href="/admin/_admin.css?v=4">
+
+  <script src="https://cdn.jsdelivr.net/npm/uikit@3/dist/js/uikit.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/uikit@3/dist/js/uikit-icons.min.js"></script>
+
+   <script src="/admin/_admin.js?v=4" defer></script>
+   <script>
+     document.addEventListener('DOMContentLoaded', () => {
+       Admin.initAdminHeader('organizer');
+     });
+   </script>
+
+</head>
+<body>
+
+<!-- ADMIN HEADER (organizer) -->
+<header class="lc-admin-header uk-background-default uk-box-shadow-small" uk-sticky="show-on-up: true; animation: uk-animation-slide-top">
+  <div class="uk-container uk-container-large">
+    <nav class="uk-navbar-container uk-navbar-transparent" uk-navbar>
+      <div class="uk-navbar-left">
+        <a class="uk-navbar-item uk-logo lc-admin-logo" href="/admin/">
+          <span class="lc-badge">LC</span>
+          <span class="uk-margin-small-left">LazaCup <span class="uk-text-muted">Admin</span></span>
+        </a>
+
+        <ul class="uk-navbar-nav uk-visible@m" id="adminNav">
+          <li><a class="uk-disabled" href="/admin/organizer/tournaments.html">Турниры</a></li>
+          <li><a href="/admin/organizer/stages.html">Этапы</a></li>
+          <li><a href="/admin/organizer/stage-categories.html">Категории</a></li>
+          <li><a href="/admin/organizer/field-rules.html">Поля</a></li>
+          <li><a href="/admin/organizer/squads-import.html">Команды</a></li>
+          <li><a href="/admin/organizer/groups.html">Группы</a></li>
+          <li><a href="/admin/organizer/playoff.html">Плей-офф</a></li>
+          <li><a href="/admin/organizer/schedule.html">Расписание</a></li>
+        </ul>
+      </div>
+
+      <div class="uk-navbar-right">
+        <div class="uk-navbar-item uk-visible@m">
+          <span class="uk-text-small uk-text-muted">Вы:</span>
+          <span id="adminUser" class="uk-text-small uk-margin-small-left">—</span>
+        </div>
+
+        <div class="uk-navbar-item">
+          <button id="btnLogout" class="uk-button uk-button-default" type="button">
+            <span uk-icon="sign-out"></span> Выйти
+          </button>
+        </div>
+
+        <a class="uk-navbar-toggle uk-hidden@m" uk-toggle="target: #adminOffcanvas" href="#">
+          <span uk-navbar-toggle-icon></span>
+        </a>
+      </div>
+    </nav>
+  </div>
+</header>
+
+<div id="adminOffcanvas" uk-offcanvas="overlay: true">
+  <div class="uk-offcanvas-bar">
+    <button class="uk-offcanvas-close" type="button" uk-close></button>
+
+    <div class="uk-margin">
+      <div class="uk-text-small uk-text-muted">Вы:</div>
+      <div id="adminUserMobile">—</div>
+    </div>
+
+    <ul class="uk-nav uk-nav-default" id="adminNavMobile">
+      <li><a class="uk-disabled" href="/admin/organizer/tournaments.html">Турниры</a></li>
+      <li><a href="/admin/organizer/stages.html">Этапы</a></li>
+      <li><a href="/admin/organizer/stage-categories.html">Категории</a></li>
+      <li><a href="/admin/organizer/field-rules.html">Поля</a></li>
+      <li><a href="/admin/organizer/squads-import.html">Команды</a></li>
+      <li class="uk-nav-divider"></li>
+      <li><a href="/admin/organizer/groups.html">Группы</a></li>
+      <li><a href="/admin/organizer/playoff.html">Плей-офф</a></li>
+      <li><a href="/admin/organizer/schedule.html">Расписание</a></li>
+      <li><a href="#" id="btnLogoutMobile">Выйти</a></li>
+    </ul>
+  </div>
+</div>
+<!-- /ADMIN HEADER (organizer) -->
+
+
+<div class="uk-container uk-container-large uk-margin-large-top">
+
+  <div class="uk-flex uk-flex-between uk-flex-middle uk-margin">
+    <h2 class="uk-margin-remove">Турниры</h2>
+    <div class="uk-flex uk-flex-middle uk-grid-small" uk-grid>
+      турниры
+    </div>
+  </div>
+
+  <div class="uk-card uk-card-default uk-card-body uk-margin">
+    <div class="uk-flex uk-flex-between uk-flex-middle">
+      <h4 id="formTitle" class="uk-margin-remove-top">Добавить турнир</h4>
+      <div id="formState" class="uk-text-small muted"></div>
+    </div>
+
+    <input type="hidden" id="id">
+
+    <div class="uk-grid-small uk-margin-small-top" uk-grid>
+      <div class="uk-width-expand@m">
+        <label class="uk-form-label">Название</label>
+        <input id="name" class="uk-input" placeholder="Весна 2026" autocomplete="off">
+      </div>
+
+      <div class="uk-width-auto@m uk-flex uk-flex-bottom uk-grid-small" uk-grid>
+        <button id="btnReset" class="uk-button uk-button-default" type="button">Очистить</button>
+        <button id="btnSave" class="uk-button uk-button-primary" type="button">Сохранить</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="uk-card uk-card-default uk-card-body">
+    <div class="uk-flex uk-flex-between uk-flex-middle uk-margin-small">
+      <h4 class="uk-margin-remove">Список турниров</h4>
+      <button id="btnReload" class="uk-button uk-button-default" type="button">Обновить</button>
+    </div>
+
+    <div class="uk-overflow-auto">
+      <table class="uk-table uk-table-small uk-table-divider uk-table-hover">
+        <thead>
+          <tr>
+            <th style="width:90px">ID</th>
+            <th>Название</th>
+            <th style="width:220px">Создан</th>
+            <th class="uk-text-center" style="width:100px">Архив</th>
+            <th class="uk-text-center" style="width:120px">Текущий</th>
+            <th class="uk-text-right" style="width:280px">Действия</th>
+          </tr>
+        </thead>
+        <tbody id="tbody"></tbody>
+      </table>
+    </div>
+  </div>
+
+</div>
+
+
+<script>
+(function(){
+  // v2026-01-30 (edit fix + delegation)
+  const API_LIST = '/api/tournament/tournaments.php';
+  const API_SAVE = '/api/tournament/tournament_save.php';
+  const API_DEL  = '/api/tournament/tournament_delete.php';
+  const API_SET_CURRENT = '/api/tournament/tournament_set_current.php';
+  const API_ARCHIVE = '/api/tournament/tournament_archive.php';
+  const API_UNARCHIVE = '/api/tournament/tournament_unarchive.php';
+
+  const el = (id) => document.getElementById(id);
+  const tbody = el('tbody');
+
+  const state = {
+    items: [],
+    byId: new Map(),
+    editingId: 0,
+    busy: false
+  };
+
+  function notify(msg, status='primary') {
+    UIkit.notification({message: msg, status, pos:'top-right', timeout: 2500});
+  }
+
+  function redirectLoginIf401(res) {
+    if (res.status === 401) {
+      location.href = '/admin/login.html?next=' + encodeURIComponent(location.pathname);
+      return true;
+    }
+    return false;
+  }
+
+  async function safeJson(res) {
+    const txt = await res.text();
+    let j = null;
+    try { j = JSON.parse(txt); } catch(e) {}
+
+    if (redirectLoginIf401(res)) return null;
+
+    if (res.status === 403) {
+      throw new Error((j && j.error) ? j.error : 'Доступ запрещён');
+    }
+
+    if (!res.ok) {
+      throw new Error(`HTTP ${res.status}: ` + ((j && j.error) ? j.error : (txt.slice(0, 400) || 'empty response')));
+    }
+    if (!j || !j.ok) {
+      throw new Error((j && j.error) ? j.error : (txt.slice(0, 400) || 'bad json/empty response'));
+    }
+    return j;
+  }
+
+  function setEditMode(id) {
+    state.editingId = id || 0;
+
+    const title = el('formTitle');
+    const st = el('formState');
+
+    [...tbody.querySelectorAll('tr')].forEach(tr => {
+      tr.classList.toggle('is-editing', Number(tr.dataset.id || 0) === state.editingId && state.editingId > 0);
+    });
+
+    if (state.editingId > 0) {
+      title.textContent = 'Редактировать турнир';
+      st.textContent = 'ID: ' + state.editingId;
+    } else {
+      title.textContent = 'Добавить турнир';
+      st.textContent = '';
+    }
+  }
+
+  function resetForm() {
+    el('id').value = '';
+    el('name').value = '';
+    setEditMode(0);
+  }
+
+  function fillForm(t) {
+    const id = Number(t && t.id ? t.id : 0);
+    el('id').value = id ? String(id) : '';
+    el('name').value = (t && t.name) ? String(t.name) : '';
+    setEditMode(id);
+
+    el('name').focus();
+    window.scrollTo({top:0, behavior:'smooth'});
+  }
+
+  function render() {
+    tbody.innerHTML = '';
+
+    state.byId.clear();
+    (state.items || []).forEach(t => state.byId.set(Number(t.id), t));
+
+    (state.items || []).forEach(t => {
+      const id = Number(t.id || 0);
+      const isCur = (Number(t.is_current || 0) === 1);
+      const archived = Number(t.is_archived || 0) === 1;
+      const archTitle = archived ? 'Нельзя сделать текущим архивный турнир' : '';
+
+      const tr = document.createElement('tr');
+      tr.dataset.id = String(id);
+
+      tr.innerHTML = `
+        <td class="mono"></td>
+        <td class="cellName"></td>
+        <td class="mono"></td>
+        <td class="uk-text-center uk-text-small cellArchive"></td>
+
+        <td class="uk-text-center">
+          <input class="uk-radio js-current" type="radio" name="curTournament" value="${id}" title="${archTitle}"
+            ${isCur ? 'checked' : ''} ${archived ? 'disabled' : ''}>
+        </td>
+
+        <td class="uk-text-right">
+          <div class="uk-button-group">
+            <button class="uk-button uk-button-small uk-button-default btnEdit" type="button" data-id="${id}" ${archived ? 'disabled' : ''}>Изм.</button>
+            <button class="uk-button uk-button-small uk-button-danger btnDel" type="button" data-id="${id}" ${archived ? 'disabled' : ''}>Удал.</button>
+            <button class="uk-button uk-button-small uk-button-secondary btnArchive" type="button" data-id="${id}" ${archived ? 'hidden' : ''}>В архив</button>
+            <button class="uk-button uk-button-small uk-button-default btnUnarchive" type="button" data-id="${id}" ${archived ? '' : 'hidden'}>Из архива</button>
+          </div>
+        </td>
+      `;
+
+      tr.children[0].textContent = String(id || '');
+      tr.querySelector('.cellName').textContent = (t.name || '');
+      tr.children[2].textContent = (t.created_at || '');
+      const archCell = tr.querySelector('.cellArchive');
+      if (archCell) {
+        archCell.textContent = archived ? 'Да' : '—';
+        if (archived && t.archived_at) {
+          archCell.title = String(t.archived_at);
+        }
+      }
+
+      tbody.appendChild(tr);
+    });
+
+    setEditMode(state.editingId);
+  }
+
+  async function load() {
+    const res = await fetch(API_LIST, {credentials:'same-origin'});
+    const j = await safeJson(res);
+    if (!j) return;
+
+    state.items = j.tournaments || [];
+    render();
+  }
+
+  async function saveTournament() {
+    if (state.busy) return;
+    state.busy = true;
+
+    const btn = el('btnSave');
+    btn.disabled = true;
+
+    try {
+      const name = el('name').value.trim();
+      if (!name) { notify('Укажи название турнира', 'warning'); return; }
+
+      const id = el('id').value ? Number(el('id').value) : 0;
+
+      const res = await fetch(API_SAVE, {
+        method:'POST',
+        credentials:'same-origin',
+        headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({id, name})
+      });
+
+      const j = await safeJson(res);
+      if (!j) return;
+
+      notify(id ? 'Турнир обновлён' : 'Турнир создан', 'success');
+      resetForm();
+      await load();
+
+    } catch(e) {
+      notify(e.message || 'Ошибка сохранения', 'danger');
+    } finally {
+      btn.disabled = false;
+      state.busy = false;
+    }
+  }
+
+  async function delTournament(id) {
+    if (!id || state.busy) return;
+
+    if (!confirm('Удалить турнир #' + id + '?\nЕсли есть связанные этапы — удаление может быть запрещено БД.')) return;
+
+    state.busy = true;
+
+    try {
+      const res = await fetch(API_DEL, {
+        method:'POST',
+        credentials:'same-origin',
+        headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({id})
+      });
+
+      const j = await safeJson(res);
+      if (!j) return;
+
+      if (state.editingId === id) resetForm();
+
+      notify('Турнир удалён', 'success');
+      await load();
+
+    } catch(e) {
+      notify(e.message || 'Ошибка удаления', 'danger');
+    } finally {
+      state.busy = false;
+    }
+  }
+
+  async function setCurrentTournament(id) {
+    id = Number(id || 0);
+    if (!id || state.busy) return;
+
+    state.busy = true;
+    try {
+      const res = await fetch(API_SET_CURRENT, {
+        method:'POST',
+        credentials:'same-origin',
+        headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({id})
+      });
+      const j = await safeJson(res);
+      if (!j) return;
+
+      notify('Текущий турнир выбран', 'success');
+      await load();
+    } catch(e) {
+      notify(e.message || 'Ошибка установки текущего турнира', 'danger');
+      await load().catch(()=>{});
+    } finally {
+      state.busy = false;
+    }
+  }
+
+  async function archiveTournament(id, toArchive) {
+    id = Number(id || 0);
+    if (!id || state.busy) return;
+
+    const msg = toArchive
+      ? ('Отправить турнир #' + id + ' в архив? Он перестанет быть текущим, изменения через API будут запрещены.')
+      : ('Вернуть турнир #' + id + ' из архива?');
+    if (!confirm(msg)) return;
+
+    state.busy = true;
+    try {
+      const url = toArchive ? API_ARCHIVE : API_UNARCHIVE;
+      const res = await fetch(url, {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id })
+      });
+      const j = await safeJson(res);
+      if (!j) return;
+
+      notify(toArchive ? 'Турнир в архиве' : 'Турнир снова активен', 'success');
+      if (state.editingId === id) resetForm();
+      await load();
+    } catch (e) {
+      notify(e.message || 'Ошибка', 'danger');
+    } finally {
+      state.busy = false;
+    }
+  }
+
+  // Делегирование кликов по кнопкам
+  tbody.addEventListener('click', (e) => {
+    const editBtn = e.target.closest('button.btnEdit');
+    if (editBtn) {
+      const id = Number(editBtn.dataset.id || 0);
+      const t = state.byId.get(id);
+      if (!t) { notify('Не нашёл турнир #' + id, 'danger'); return; }
+      fillForm(t);
+      return;
+    }
+
+    const delBtn = e.target.closest('button.btnDel');
+    if (delBtn) {
+      const id = Number(delBtn.dataset.id || 0);
+      delTournament(id);
+      return;
+    }
+
+    const archBtn = e.target.closest('button.btnArchive');
+    if (archBtn) {
+      archiveTournament(Number(archBtn.dataset.id || 0), true);
+      return;
+    }
+
+    const unarchBtn = e.target.closest('button.btnUnarchive');
+    if (unarchBtn) {
+      archiveTournament(Number(unarchBtn.dataset.id || 0), false);
+      return;
+    }
+  });
+
+  // Переключение “текущего” — строго из списка
+  tbody.addEventListener('change', (e) => {
+    const r = e.target.closest('input.js-current');
+    if (r && r.checked) {
+      setCurrentTournament(Number(r.value || 0));
+    }
+  });
+
+  el('btnReload').addEventListener('click', () => load().catch(e => notify(e.message,'danger')));
+  el('btnSave').addEventListener('click', () => saveTournament());
+  el('btnReset').addEventListener('click', resetForm);
+
+  el('name').addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      saveTournament();
+    }
+  });
+
+  resetForm();
+  load().catch(e => notify(e.message,'danger'));
+})();
+</script>
+
+</body>
+</html>

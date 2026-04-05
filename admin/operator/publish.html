@@ -1,0 +1,875 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>LazaCup — Публикация (превью)</title>
+
+   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/uikit@3/dist/css/uikit.min.css">
+  <link rel="stylesheet" href="/admin/_admin.css?v=4">
+
+  <script src="https://cdn.jsdelivr.net/npm/uikit@3/dist/js/uikit.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/uikit@3/dist/js/uikit-icons.min.js"></script>
+   <script src="/admin/_admin.js?v=4" defer></script>
+   <script>
+     document.addEventListener('DOMContentLoaded', () => {
+       Admin.initAdminHeader('organizer','operator');
+     });
+   </script>
+
+</head>
+<body>
+
+<header class="lc-admin-header">
+  <div class="uk-container uk-container-expand">
+    <nav class="uk-navbar-container uk-navbar-transparent" uk-navbar>
+      <div class="uk-navbar-left">
+        <a class="uk-navbar-item uk-logo" href="/admin/operator/">
+          <span class="lc-logo">LC</span>
+          <span class="uk-margin-small-left">LazaCup</span>
+          <span class="lc-operator-badge">оператор</span>
+        </a>
+
+        <ul class="uk-navbar-nav uk-visible@m" id="adminNav">
+          <li><a href="/admin/operator/index.html">Оператор</a></li>
+          <li><a href="/admin/operator/board.html">Шахматка</a></li>
+          <li><a href="/admin/operator/schedule.html">Расписание</a></li>
+          <li><a class="uk-disabled" href="/admin/operator/publish.html">Публикация</a></li>
+        </ul>
+
+      </div>
+      <div class="uk-navbar-right">
+        <div class="uk-navbar-item uk-visible@m">
+          <span class="uk-text-small uk-text-muted">Вы:</span>
+          <span id="adminUser" class="uk-text-small uk-margin-small-left">—</span>
+        </div>
+
+        <div data-show-for="organizer" class="uk-navbar-item">
+            <a class="uk-navbar-toggle" uk-toggle="target: #adminOffcanvas" href="#">
+               <span uk-navbar-toggle-icon></span>
+            </a>
+            <div id="adminOffcanvas" uk-offcanvas="overlay: true">
+               <div class="uk-offcanvas-bar">
+                 <button class="uk-offcanvas-close" type="button" uk-close></button>
+                 <ul class="uk-nav uk-nav-default" id="adminNavMobile">
+                   <li><a href="/admin/organizer">Админ</a></li>
+                   <li><a href="/admin/organizer/tournaments.html">Турниры</a></li>
+                   <li><a href="/admin/organizer/stages.html">Этапы</a></li>
+                   <li><a href="/admin/organizer/stage-categories.html">Категории</a></li>
+                   <li><a href="/admin/organizer/field-rules.html">Поля</a></li>
+                   <li><a href="/admin/organizer/squads-import.html">Команды</a></li>
+                   <li><a href="/admin/organizer/groups.html">Группы</a></li>
+                   <li><a href="/admin/organizer/playoff.html">Плей-офф</a></li>
+                   <li><a href="/admin/organizer/schedule.html">Расписание</a></li>
+                 </ul>
+               </div>
+            </div>
+         </div>
+
+        <div class="uk-navbar-item">
+          <button id="btnLogout" class="uk-button uk-button-default" type="button">
+            <span uk-icon="sign-out"></span> Выйти
+          </button>
+        </div>
+    </nav>
+  </div>
+</header>
+
+<div class="uk-container uk-container-large uk-margin-top uk-margin-bottom">
+
+<div class="uk-flex uk-flex-between uk-flex-middle uk-margin-small">
+  <div>
+    <h2 class="uk-margin-remove">Публикация результатов (превью)</h2>
+    <div id="stageLine" class="uk-text-meta uk-margin-small-top"></div>
+  </div>
+
+  <!-- ✅ Статус + история публикаций -->
+  <div class="uk-text-right" style="min-width: 520px;">
+    <div id="pubLastLine" class="uk-text-meta">Последняя публикация: —</div>
+    <div id="pubSelectedLine" class="uk-text-meta uk-margin-small-top"></div>
+
+    <ul class="uk-accordion uk-margin-small-top" uk-accordion="multiple: true; collapsible: true">
+      <li>
+        <a class="uk-accordion-title" href="#" style="font-size:14px;">История публикаций</a>
+        <div class="uk-accordion-content">
+
+          <div class="uk-flex uk-flex-between uk-flex-middle uk-margin-small">
+            <a href="#" id="pubToggle" class="uk-link-muted">История публикаций</a>
+
+            <div class="uk-flex uk-flex-middle uk-grid-small" uk-grid>
+              <div>
+                <select class="uk-select uk-form-small" id="pubCatFilter" style="min-width:160px">
+                  <option value="">Все категории</option>
+                </select>
+              </div>
+              <div>
+                <select class="uk-select uk-form-small" id="pubDayFilter" style="min-width:110px">
+                  <option value="">Все дни</option>
+                </select>
+              </div>
+              <div>
+                <button class="uk-button uk-button-default uk-button-small" id="pubFilterReset" type="button">Сброс</button>
+              </div>
+            </div>
+          </div>
+
+          <div class="uk-overflow-auto">
+            <table class="uk-table uk-table-small uk-table-divider uk-table-middle">
+              <thead>
+                <tr>
+                  <th style="white-space:nowrap;">Время</th>
+                  <th>Тип</th>
+                  <th>Кат</th>
+                  <th>Вар</th>
+                  <th>День</th>
+                  <th>VK</th>
+                  <th>Статус</th>
+                </tr>
+              </thead>
+              <tbody id="pubHistoryBody">
+                <tr><td colspan="7" class="uk-text-muted">Загрузка…</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </li>
+    </ul>
+  </div>
+</div>
+
+  <div class="uk-grid uk-grid-medium" uk-grid>
+    <div class="uk-width-1-1 uk-width-1-3@l">
+      <div class="uk-card uk-card-default uk-card-body">
+        <h4 class="uk-margin-small">Параметры</h4>
+
+        <div class="uk-margin-small">
+          <label class="uk-form-label">Категория</label>
+          <div class="uk-form-controls">
+            <select class="uk-select" id="catSelect"></select>
+          </div>
+        </div>
+
+        <div class="uk-margin-small">
+          <label class="uk-form-label">Вариант</label>
+          <div class="uk-form-controls" id="variantPills"></div>
+        </div>
+
+        <div class="uk-margin-small">
+          <label class="uk-form-label">День</label>
+          <div class="uk-form-controls">
+<select id="dayNo" class="uk-select"></select>
+          </div>
+        </div>
+
+        <div class="uk-margin-small">
+          <label class="uk-form-label">Шапка / сезон</label>
+          <div class="uk-form-controls">
+            <input class="uk-input" id="seasonText" type="text" value="26 Весна" placeholder="например: 26 Весна">
+          </div>
+        </div>
+
+        <div class="uk-margin-small">
+          <label><input class="uk-checkbox" id="showResults" type="checkbox" checked> Показать результаты</label>
+          <div class="uk-text-meta uk-margin-small-top">Если включено — под таблицей показываются результаты матчей дня, а в шапке используется волна. Если выключено — только таблица группы и кубок в шапке.</div>
+        </div>
+
+        <div class="uk-margin-small btn-block">
+          <button type="button" class="uk-button uk-button-primary" id="btnBuild">Сгенерировать превью</button>
+          <button type="button" class="uk-button uk-button-default" id="btnCopy" title="Скопировать текст поста" disabled>Копировать текст</button>
+          <button type="button" class="uk-button uk-button-secondary" id="btnPublish" disabled>Опубликовать</button>
+        </div>
+
+        <hr>
+
+        <div id="postBox">
+          <h4 class="uk-margin-small">Текст поста (черновик)</h4>
+          <textarea class="uk-textarea lc-mono" rows="7" id="postText" placeholder="Сначала сгенерируй превью…"></textarea>
+          <!-- <div class="uk-text-meta uk-margin-small-top">Сейчас это только превью/черновик. Кнопку «Отправить в VK» добавим следующим шагом.</div> -->
+        </div>
+      </div>
+    </div>
+
+    <div class="uk-width-1-1 uk-width-2-3@l">
+      <div class="uk-card uk-card-default uk-card-body">
+        <div class="uk-flex uk-flex-between uk-flex-middle">
+          <h4 class="uk-margin-small">Картинки групп</h4>
+          <div id="status" class="uk-text-meta"></div>
+        </div>
+        <div id="stubBox" class="uk-alert uk-alert-primary" hidden></div>
+        <div id="previews" class="uk-grid uk-grid-small lc-preview-grid uk-child-width-1-1 uk-child-width-1-2@m" uk-grid uk-lightbox="animation: fade"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+(() => {
+  const Admin = window.Admin || { requireRole: async () => {} };
+
+  // API
+  const API_CURRENT = '/api/tournament/current.php';
+  const API_PUBLIC  = '/api/tournament/public.php';
+  const API_PREVIEW = '/api/tournament/publish_preview.php';
+  const API_VKPOST  = '/api/tournament/publish_table.php';
+  const API_PUBLOG  = '/api/tournament/publish_log.php';
+
+  // State
+  let SNAP = { sid: '', files: [] };
+  let DAYS_CACHE = []; // ['2026-03-28', ...]
+  let CURRENT = null;
+  let CATS = [];
+  let ACTIVE_CAT = null;
+  let ACTIVE_VARIANT = 1;
+
+  // DOM helpers
+  const el = (id) => document.getElementById(id);
+
+  const vkPostUrl = (ownerId, postId) =>
+    (ownerId && postId) ? `https://vk.com/wall${ownerId}_${postId}` : '';
+
+  const fmtTs = (ts) => String(ts || '').replace('T', ' ').slice(0, 16);
+
+  // Safety: disable any form submit bubbling
+  document.addEventListener('submit', (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+  }, true);
+
+  const notify = (msg, status = 'primary') =>
+    UIkit.notification({ message: msg, status, pos: 'top-right', timeout: 2500 });
+
+  function updatePublishBtnState() {
+    const btn = el('btnPublish');
+    if (!btn) return;
+    const msg = (el('postText') ? (el('postText').value || '') : '').trim();
+    btn.disabled = !(SNAP.sid && SNAP.files.length && msg);
+  }
+
+  async function apiGet(url) {
+    const r = await fetch(url, { credentials: 'same-origin' });
+    if (r.status === 401) { location.href = '/admin/login.html'; return null; }
+    const j = await r.json().catch(() => null);
+    if (!j || j.ok !== true) throw new Error((j && j.error) ? j.error : 'API error');
+    return j;
+  }
+
+  async function apiPost(url, data) {
+    const r = await fetch(url, {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data)
+    });
+    if (r.status === 401) { location.href = '/admin/login.html'; return null; }
+    const j = await r.json().catch(() => null);
+    if (!j || j.ok !== true) throw new Error((j && j.error) ? j.error : 'API error');
+    return j;
+  }
+
+  // ============================
+  // Publish history + UI helpers
+  // ============================
+  function getSelectionKey() {
+    const cat = String((el('catSelect') ? el('catSelect').value : '') || ACTIVE_CAT || '').trim();
+    const variant = parseInt(ACTIVE_VARIANT, 10) || 1;
+    const dayNo = parseInt(el('dayNo')?.value, 10) || 1;
+    return { cat, variant, dayNo };
+  }
+
+  function highlightHistoryRow() {
+    const body = el('pubHistoryBody');
+    if (!body) return;
+
+    const { cat, variant, dayNo } = getSelectionKey();
+
+    [...body.querySelectorAll('tr')].forEach(tr => tr.classList.remove('lc-row-active'));
+
+    // row has data attributes
+    const hit = body.querySelector(`tr[data-cat="${CSS.escape(cat)}"][data-var="${variant}"][data-day="${dayNo}"]`);
+    if (hit) hit.classList.add('lc-row-active');
+  }
+
+  async function loadPublishHistory() {
+    if (!CURRENT?.stage?.id) return;
+
+    try {
+      const j = await apiGet(`${API_PUBLOG}?stage_id=${CURRENT.stage.id}`);
+      const items = j.items || [];
+
+      // Top line: last
+      const last = items[0] || null;
+      if (el('pubLastLine')) {
+        if (last) {
+          const vk = (last.vk_owner_id && last.vk_post_id)
+            ? (last.vk_post_url || vkPostUrl(last.vk_owner_id, last.vk_post_id))
+            : '';
+
+          el('pubLastLine').innerHTML = (last.status === 'OK')
+            ? `✓ Последняя: ${last.kind || 'table'} · ${last.category || '—'} / вар.${last.variant || '—'} · день ${last.day_no || '—'} · ${fmtTs(last.created_at)}${vk ? ` · <a href="${vk}" target="_blank" rel="noopener">открыть</a>` : ''}`
+            : `⚠ Последняя: ошибка · ${fmtTs(last.created_at)}`;
+        } else {
+          el('pubLastLine').textContent = 'Последняя публикация: —';
+        }
+      }
+
+      // Table
+      const body = el('pubHistoryBody');
+      if (!body) return;
+
+      if (!items.length) {
+        body.innerHTML = `<tr><td colspan="7" class="uk-text-muted">Пока пусто</td></tr>`;
+        return;
+      }
+
+      body.innerHTML = items.map(r => {
+        const vk = (r.vk_owner_id && r.vk_post_id)
+          ? (r.vk_post_url || vkPostUrl(r.vk_owner_id, r.vk_post_id))
+          : '';
+
+        const vkCell = vk ? `<a href="${vk}" target="_blank" rel="noopener">пост</a>` : '—';
+        const st = (r.status === 'OK')
+          ? `<span class="uk-label uk-label-success">OK</span>`
+          : `<span class="uk-label uk-label-danger">ERR</span>`;
+
+        const cat = String(r.category || '');
+        const v = parseInt(r.variant, 10) || 0;
+        const d = parseInt(r.day_no, 10) || 0;
+
+        return `
+          <tr data-cat="${cat.replace(/"/g,'&quot;')}" data-var="${v}" data-day="${d}">
+            <td style="white-space:nowrap;">${fmtTs(r.created_at)}</td>
+            <td>${r.kind || '—'}</td>
+            <td>${r.category || '—'}</td>
+            <td>${r.variant || '—'}</td>
+            <td>${r.day_no || '—'}</td>
+            <td>${vkCell}</td>
+            <td>${st}</td>
+          </tr>
+        `;
+      }).join('');
+
+      fillPubCatFilterFromStageCats();
+      fillPubDayFilterFromRows();
+      applyPubFilters();
+      highlightHistoryRow();
+
+    } catch (e) {
+      if (el('pubLastLine')) el('pubLastLine').innerHTML = '⚠ История недоступна';
+      const body = el('pubHistoryBody');
+      if (body) body.innerHTML = `<tr><td colspan="7" class="uk-text-danger">Ошибка загрузки</td></tr>`;
+    }
+  }
+
+  function fillPubCatFilterFromStageCats() {
+    const sel = el('pubCatFilter');
+    if (!sel) return;
+
+    const cur = String(sel.value || '');
+    const cats = Array.isArray(CATS) ? CATS.map(x => String(x.category || '')).filter(Boolean) : [];
+
+    sel.innerHTML =
+      `<option value="">Все категории</option>` +
+      cats.map(c => `<option value="${c}">${c}</option>`).join('');
+
+    // сохранить выбор, если он ещё существует
+    if (cur && cats.includes(cur)) sel.value = cur;
+  }
+
+  function fillPubDayFilterFromRows() {
+    const sel = el('pubDayFilter');
+    const body = el('pubHistoryBody');
+    if (!sel || !body) return;
+
+    const days = [...body.querySelectorAll('tr')]
+      .map(tr => tr.dataset.day)
+      .filter(Boolean);
+
+    const uniq = [...new Set(days)].sort((a,b)=>Number(a)-Number(b));
+
+    const cur = sel.value || '';
+
+    sel.innerHTML =
+      `<option value="">Все дни</option>` +
+      uniq.map(d => `<option value="${d}">День ${d}</option>`).join('');
+
+    if (cur && uniq.includes(cur)) sel.value = cur;
+  }
+
+  function applyPubFilters() {
+    const catSel = el('pubCatFilter');
+    const daySel = el('pubDayFilter');
+
+    const cat = catSel ? String(catSel.value || '') : '';
+    const day = daySel ? String(daySel.value || '') : '';
+
+    const body = el('pubHistoryBody');
+    if (!body) return;
+
+    [...body.querySelectorAll('tr')].forEach(tr => {
+
+      const rowCat = String(tr.dataset.cat || '');
+      const rowDay = String(tr.dataset.day || '');
+
+      const catMatch = !cat || rowCat === cat;
+      const dayMatch = !day || rowDay === day;
+
+      tr.style.display = (catMatch && dayMatch) ? '' : 'none';
+    });
+
+    highlightHistoryRow();
+  }
+
+  async function checkAlreadyPublishedForSelection() {
+    if (!CURRENT?.stage?.id) return;
+
+    const { cat, variant, dayNo } = getSelectionKey();
+    if (!cat) return;
+
+    try {
+      const q = `${API_PUBLOG}?stage_id=${CURRENT.stage.id}&category=${encodeURIComponent(cat)}&variant=${variant}&day_no=${dayNo}`;
+      const j = await apiGet(q);
+      const items = j.items || [];
+
+      const line = el('pubSelectedLine');
+      const btn = el('btnPublish');
+
+      if (items.length) {
+        const last = items[0];
+        const created = fmtTs(last.created_at);
+        const vk = (last.vk_owner_id && last.vk_post_id)
+          ? (last.vk_post_url || vkPostUrl(last.vk_owner_id, last.vk_post_id))
+          : '';
+
+        // Если совпадает с "последней" — не дублируем тревогу
+        const lastLineText = (el('pubLastLine')?.textContent || el('pubLastLine')?.innerText || '').trim();
+
+        const sameAsLast =
+          lastLineText.includes(`· ${last.category || ''}`) &&
+          lastLineText.includes(`вар.${last.variant || ''}`) &&
+          lastLineText.includes(`день ${last.day_no || ''}`) &&
+          lastLineText.includes(created);
+
+         if (line) {
+           if (sameAsLast) {
+             // ✅ ничего не показываем — строка "Последняя" уже всё сказала
+             line.textContent = '';
+           } else {
+             const created = fmtTs(last.created_at);
+             const vk = (last.vk_owner_id && last.vk_post_id)
+               ? (last.vk_post_url || vkPostUrl(last.vk_owner_id, last.vk_post_id))
+               : '';
+
+             line.innerHTML =
+               `ℹ Уже есть публикация: ${cat} / вар.${variant} · день ${dayNo} · ${created}` +
+               (vk ? ` · <a href="${vk}" target="_blank" rel="noopener">открыть</a>` : '');
+           }
+         }
+        if (btn) btn.textContent = 'Переопубликовать';
+
+        highlightHistoryRow();
+        return;
+      }
+
+      if (line) line.textContent = '';
+      if (btn) btn.textContent = 'Опубликовать';
+
+      highlightHistoryRow();
+
+    } catch (e) {
+      // молчим — это подсказка, не критичный функционал
+    }
+  }
+
+  // ============================
+  // Variants + Days
+  // ============================
+  async function loadVariants() {
+    const vj = await apiGet(`${API_PUBLIC}?type=variants&stage_id=${CURRENT.stage.id}&category=${encodeURIComponent(ACTIVE_CAT || '')}`);
+    const variants = vj.items || [1];
+    ACTIVE_VARIANT = variants[0] || 1;
+
+    el('variantPills').innerHTML = variants.map((v, idx) =>
+      `<button class="uk-button ${idx === 0 ? 'uk-button-primary' : 'uk-button-default'} uk-button-small" data-v="${v}">Вариант ${v}</button>`
+    ).join(' ');
+
+    el('variantPills').onclick = (e) => {
+      const b = e.target.closest('button[data-v]');
+      if (!b) return;
+
+      [...el('variantPills').querySelectorAll('button')].forEach(x => {
+        x.classList.remove('uk-button-primary');
+        x.classList.add('uk-button-default');
+      });
+
+      b.classList.add('uk-button-primary');
+      b.classList.remove('uk-button-default');
+
+      ACTIVE_VARIANT = parseInt(b.dataset.v, 10) || 1;
+
+      refreshDayMax()
+        .then(checkAlreadyPublishedForSelection)
+        .catch(() => {});
+    };
+  }
+
+  async function refreshDayMax() {
+    const dayEl = el('dayNo'); // <select>
+    if (!dayEl || !CURRENT?.stage?.id) return;
+
+    const cat = String((el('catSelect') ? el('catSelect').value : '') || ACTIVE_CAT || '').trim();
+    const v = parseInt(ACTIVE_VARIANT, 10) || 1;
+    if (!cat) return;
+
+    const prevRaw = String(dayEl.value || '').trim();
+    const prevIsFinal = (prevRaw === '999');
+
+    const j = await apiPost(API_PREVIEW, {
+      stage_id: CURRENT.stage.id,
+      category: cat,
+      variant: v,
+      day: 1,
+      dry: 1
+    });
+
+    const days = Array.isArray(j.days) ? j.days : [];
+    DAYS_CACHE = days;
+
+    const dc = days.length || (parseInt(j.day_count, 10) || 1);
+
+    let cur = parseInt(prevRaw, 10) || 1;
+    if (cur < 1) cur = 1;
+    if (cur > dc) cur = dc;
+
+    if (days.length) {
+      dayEl.innerHTML = days.map((d, idx) => {
+        const dayNo = idx + 1;
+        const selected = (!prevIsFinal && dayNo === cur) ? ' selected' : '';
+        return `<option value="${dayNo}" data-date="${d}"${selected}>${dayNo} — ${d}</option>`;
+      }).join('');
+    } else {
+      dayEl.innerHTML = Array.from({ length: dc }, (_, idx) => {
+        const dayNo = idx + 1;
+        const selected = (!prevIsFinal && dayNo === cur) ? ' selected' : '';
+        return `<option value="${dayNo}"${selected}>День ${dayNo}</option>`;
+      }).join('');
+    }
+
+    const finalOption = j.final_option || { value: 999, label: 'ИТОГ' };
+    dayEl.insertAdjacentHTML('beforeend', `<option value="${String(finalOption.value)}"${prevIsFinal ? ' selected' : ''}>${String(finalOption.label)}</option>`);
+
+    dayEl.value = prevIsFinal ? String(finalOption.value) : String(cur);
+    highlightHistoryRow();
+  }
+
+  function buildPostText(cat, day) {
+    return [
+      `Групповой этап — ${cat}`,
+      `День ${day}`,
+      `результаты за этот игровой день`,
+      '',
+      '#lazacup #результаты #футболдети'
+    ].join('\n');
+  }
+
+  // ============================
+  // Preview build
+  // ============================
+  function showPlayoffStub(title, message) {
+    const stub = el('stubBox');
+    const previews = el('previews');
+    const postBox = el('postBox');
+    const postText = el('postText');
+
+    if (stub) {
+      stub.hidden = false;
+      stub.innerHTML = `<div class="uk-text-bold">${title || 'Плей-офф'}</div><div>${message || 'Картинки скоро будут.'}</div>`;
+    }
+    if (previews) previews.innerHTML = '';
+    if (postText) postText.value = '';
+    if (postBox) postBox.style.display = 'none';
+
+    el('status').textContent = 'Плей-офф (заглушка)';
+    el('btnCopy').disabled = true;
+
+    SNAP = { sid: '', files: [] };
+    updatePublishBtnState();
+    el('btnBuild').disabled = false;
+  }
+
+  function hidePlayoffStub() {
+    const stub = el('stubBox');
+    const postBox = el('postBox');
+    if (stub) { stub.hidden = true; stub.innerHTML = ''; }
+    if (postBox) postBox.style.display = '';
+  }
+
+  async function buildPreview() {
+    const daySelect = el('dayNo');
+    const rawDayValue = String(daySelect?.value || '1').trim();
+    const isFinal = (rawDayValue === '999');
+    const rawDay = isFinal ? 999 : (parseInt(rawDayValue, 10) || 1);
+
+    // maxDay: option ИТОГ не считаем игровым днём
+    const maxDay = DAYS_CACHE.length || ((daySelect && daySelect.options) ? [...daySelect.options].filter(o => String(o.value) !== '999').length : 99);
+    const dayNo = isFinal ? 999 : Math.max(1, Math.min(maxDay || 99, rawDay));
+    if (daySelect) daySelect.value = String(dayNo);
+
+    const cat = String((el('catSelect') ? el('catSelect').value : '') || ACTIVE_CAT || '').trim();
+    ACTIVE_CAT = cat;
+
+    if (!CURRENT?.stage?.id || !cat) {
+      notify('Не выбран этап или категория', 'danger');
+      return;
+    }
+
+    el('status').textContent = 'Генерирую…';
+    el('previews').innerHTML = '';
+    el('btnCopy').disabled = true;
+    el('btnBuild').disabled = true;
+    hidePlayoffStub();
+
+    SNAP = { sid: '', files: [] };
+    updatePublishBtnState();
+
+    const pj = await apiPost(API_PREVIEW, {
+      stage_id: CURRENT.stage.id,
+      category: cat,
+      variant: ACTIVE_VARIANT,
+      day: dayNo,
+      day_no: dayNo,
+      season_text: String(el('seasonText')?.value || '26 Весна').trim(),
+      show_results: el('showResults')?.checked ? 1 : 0
+    });
+
+    const dayCount = parseInt(pj.day_count, 10) || 0;
+    const shownDay = parseInt(pj.day_no, 10) || dayNo;
+
+    if (!isFinal && dayCount > 0 && rawDay > dayCount) {
+      showPlayoffStub('Плей-офф', 'Групповой этап закончился. Картинки плей-офф скоро будут.');
+      return;
+    }
+    if (String(pj.mode || '') === 'playoff_stub') {
+      showPlayoffStub(
+        (pj.stub && pj.stub.title) ? String(pj.stub.title) : 'Плей-офф',
+        (pj.stub && pj.stub.message) ? String(pj.stub.message) : 'Картинки скоро будут.'
+      );
+      return;
+    }
+
+    const items = pj.images || [];
+    if (!items.length) {
+      el('status').textContent = '';
+      notify('Группы не найдены (или нет матчей)', 'warning');
+      el('btnBuild').disabled = false;
+      return;
+    }
+
+    SNAP.sid = String(pj.sid || '');
+    SNAP.files = Array.isArray(pj.images)
+      ? pj.images.map(x => String(x.file || '')).filter(Boolean)
+      : [];
+
+    el('status').textContent = `Сгенерировано: ${items.length}`;
+    el('postText').value = String(pj.post_text || '') || buildPostText(cat, shownDay);
+
+    el('btnCopy').disabled = false;
+    updatePublishBtnState();
+
+    el('previews').innerHTML = items.map(it => {
+      const isPlayoff = String(it.kind || '') === 'playoff';
+      const title = String(it.title || '').trim();
+      const cardTitle = title || (isPlayoff ? 'Плей-офф' : `Группа ${it.group}`);
+      const topMeta = isPlayoff
+        ? `<b>${cardTitle}</b>`
+        : `Группа <b>${it.group}</b>${it.used_manual ? ' · <span class="uk-text-warning">ручн.</span>' : ''}`;
+      return `
+      <div>
+        <div class="lc-preview-card">
+          <div class="uk-flex uk-flex-between uk-flex-middle uk-margin-small-bottom">
+            <div class="uk-text-meta">${topMeta}</div>
+            <a class="uk-link-reset uk-text-meta" href="${it.url}" data-caption="${cardTitle}">Увеличить</a>
+          </div>
+          <a href="${it.url}" data-caption="${cardTitle}">
+            <img src="${it.url}" alt="${cardTitle}">
+          </a>
+        </div>
+      </div>
+    `;
+    }).join('');
+
+    UIkit.update(el('previews'));
+    el('btnBuild').disabled = false;
+
+    await checkAlreadyPublishedForSelection();
+  }
+
+  // ============================
+  // init()
+  // ============================
+  async function init() {
+    try {
+      await Admin.requireRole(['organizer', 'operator']);
+
+      el('btnBuild').disabled = true;
+      el('btnCopy').disabled = true;
+      updatePublishBtnState();
+
+      CURRENT = await apiGet(API_CURRENT);
+
+      const st = CURRENT.stage || {};
+      const from = st.date_from || '';
+      const to   = st.date_to || '';
+      const range = (from && to) ? ` (${from} — ${to})` : '';
+      el('stageLine').textContent = st.name ? (`Текущий этап: ${st.name}${range}`) : '';
+
+      // Categories
+      const cats = await apiGet(`${API_PUBLIC}?type=stage_categories&stage_id=${CURRENT.stage.id}`);
+      CATS = cats.items || [];
+      if (!CATS.length) {
+        notify('Нет категорий для текущего этапа', 'warning');
+        return;
+      }
+
+      fillPubCatFilterFromStageCats();
+
+      el('catSelect').innerHTML = CATS.map(c => `<option value="${c.category}">${c.category}</option>`).join('');
+      ACTIVE_CAT = CATS[0].category;
+
+      el('catSelect').addEventListener('change', async () => {
+        ACTIVE_CAT = el('catSelect').value;
+        el('btnBuild').disabled = true;
+
+        await loadVariants();
+        await refreshDayMax();
+        await checkAlreadyPublishedForSelection();
+
+        el('btnBuild').disabled = false;
+      });
+
+      await loadVariants();
+      await refreshDayMax();
+
+      await loadPublishHistory();
+      await checkAlreadyPublishedForSelection();
+
+      el('btnBuild').disabled = false;
+
+      // day change => update helper line + highlight
+      if (el('dayNo')) {
+        el('dayNo').addEventListener('change', () => checkAlreadyPublishedForSelection());
+      }
+
+      el('btnBuild').addEventListener('click', async (ev) => {
+        if (ev) { ev.preventDefault(); ev.stopPropagation(); }
+        try { await buildPreview(); }
+        catch (e) {
+          notify(e.message || 'Ошибка', 'danger');
+          console.error(e);
+          el('status').textContent = '';
+          el('btnBuild').disabled = false;
+          updatePublishBtnState();
+        }
+      });
+
+      el('btnCopy').addEventListener('click', async (ev) => {
+        if (ev) { ev.preventDefault(); ev.stopPropagation(); }
+        try {
+          await navigator.clipboard.writeText(el('postText').value || '');
+          notify('Текст скопирован', 'success');
+        } catch (e) {
+          notify('Не удалось скопировать (права браузера)', 'warning');
+        }
+      });
+
+      if (el('postText')) {
+        el('postText').addEventListener('input', () => updatePublishBtnState());
+      }
+
+      // Publish with anti double click
+      if (el('btnPublish')) {
+        el('btnPublish').addEventListener('click', async (ev) => {
+          if (ev) { ev.preventDefault(); ev.stopPropagation(); }
+
+          const btn = el('btnPublish');
+          const oldText = btn.textContent;
+
+          try {
+            const message = String(el('postText').value || '').trim();
+            if (!SNAP.sid || !SNAP.files.length) return notify('Сначала сгенерируй превью', 'warning');
+            if (!message) return notify('Пустой текст', 'warning');
+
+            const cat = String((el('catSelect') ? el('catSelect').value : '') || ACTIVE_CAT || '').trim();
+            const daySel = el('dayNo');
+            const rawDayValue = String(daySel?.value || '1').trim();
+            const dayNo = (rawDayValue === '999') ? 999 : (parseInt(rawDayValue, 10) || 1);
+            const dayDate = (rawDayValue === '999') ? null : (daySel?.selectedOptions?.[0]?.dataset?.date || null);
+
+            btn.disabled = true;
+            btn.textContent = 'Публикую…';
+
+            await apiPost(API_VKPOST, {
+              sid: SNAP.sid,
+              files: SNAP.files,
+              message,
+
+              stage_id: CURRENT.stage.id,
+              category: cat,
+              variant: ACTIVE_VARIANT,
+              day_no: dayNo,
+              day_date: dayDate
+            });
+
+            notify('Пост отправлен в VK', 'success');
+
+            await loadPublishHistory();
+            await checkAlreadyPublishedForSelection();
+
+          } catch (e) {
+            notify(e.message || 'Ошибка публикации', 'danger');
+            console.error(e);
+          } finally {
+            btn.textContent = oldText;
+            btn.disabled = false;
+            updatePublishBtnState();
+          }
+        });
+      }
+
+      //if (el('pubCatFilter')) {
+      //  el('pubCatFilter').addEventListener('change', () => applyPubCatFilter());
+      //}
+      //if (el('pubFilterReset')) {
+      //  el('pubFilterReset').addEventListener('click', () => {
+      //    if (el('pubCatFilter')) el('pubCatFilter').value = '';
+      //    applyPubCatFilter();
+      //  });
+      //}
+
+      if (el('pubCatFilter')) {
+        el('pubCatFilter').addEventListener('change', applyPubFilters);
+      }
+
+      if (el('pubDayFilter')) {
+        el('pubDayFilter').addEventListener('change', applyPubFilters);
+      }
+
+      if (el('pubFilterReset')) {
+        el('pubFilterReset').addEventListener('click', () => {
+          if (el('pubCatFilter')) el('pubCatFilter').value = '';
+          if (el('pubDayFilter')) el('pubDayFilter').value = '';
+          applyPubFilters();
+        });
+      }
+
+    } catch (e) {
+      notify(e.message || 'Ошибка', 'danger');
+      console.error(e);
+    }
+  }
+
+  init();
+})();
+</script>
+
+</body>
+</html>

@@ -1,0 +1,1186 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>LazaCup — Команды этапа (импорт)</title>
+
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/uikit@3/dist/css/uikit.min.css">
+  <link rel="stylesheet" href="/admin/_admin.css?v=4">
+
+  <script src="https://cdn.jsdelivr.net/npm/uikit@3/dist/js/uikit.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/uikit@3/dist/js/uikit-icons.min.js"></script>
+
+   <script src="/admin/_admin.js?v=4" defer></script>
+   <script>
+     document.addEventListener('DOMContentLoaded', () => {
+       Admin.initAdminHeader('organizer');
+     });
+   </script>
+
+</head>
+<body>
+
+<!-- ADMIN HEADER (organizer) -->
+<header class="lc-admin-header uk-background-default uk-box-shadow-small" uk-sticky="show-on-up: true; animation: uk-animation-slide-top">
+  <div class="uk-container uk-container-large">
+    <nav class="uk-navbar-container uk-navbar-transparent" uk-navbar>
+      <div class="uk-navbar-left">
+        <a class="uk-navbar-item uk-logo lc-admin-logo" href="/admin/">
+          <span class="lc-badge">LC</span>
+          <span class="uk-margin-small-left">LazaCup <span class="uk-text-muted">Admin</span></span>
+        </a>
+
+        <ul class="uk-navbar-nav uk-visible@m" id="adminNav">
+           <li><a href="/admin/organizer/tournaments.html">Турниры</a></li>
+          <li><a href="/admin/organizer/stages.html">Этапы</a></li>
+          <li><a href="/admin/organizer/stage-categories.html">Категории</a></li>
+          <li><a href="/admin/organizer/field-rules.html">Поля</a></li>
+          <li><a class="uk-disabled" href="/admin/organizer/squads-import.html">Команды</a></li>
+          <li><a href="/admin/organizer/groups.html">Группы</a></li>
+          <li><a href="/admin/organizer/playoff.html">Плей-офф</a></li>
+          <li><a href="/admin/organizer/schedule.html">Расписание</a></li>
+        </ul>
+      </div>
+
+      <div class="uk-navbar-right">
+        <div class="uk-navbar-item uk-visible@m">
+          <span class="uk-text-small uk-text-muted">Вы:</span>
+          <span id="adminUser" class="uk-text-small uk-margin-small-left">—</span>
+        </div>
+
+        <div class="uk-navbar-item">
+          <button id="btnLogout" class="uk-button uk-button-default" type="button">
+            <span uk-icon="sign-out"></span> Выйти
+          </button>
+        </div>
+
+        <a class="uk-navbar-toggle uk-hidden@m" uk-toggle="target: #adminOffcanvas" href="#">
+          <span uk-navbar-toggle-icon></span>
+        </a>
+      </div>
+    </nav>
+  </div>
+</header>
+
+<div id="adminOffcanvas" uk-offcanvas="overlay: true">
+  <div class="uk-offcanvas-bar">
+    <button class="uk-offcanvas-close" type="button" uk-close></button>
+
+    <div class="uk-margin">
+      <div class="uk-text-small uk-text-muted">Вы:</div>
+      <div id="adminUserMobile">—</div>
+    </div>
+
+    <ul class="uk-nav uk-nav-default" id="adminNavMobile">
+      <li><a href="/admin/organizer/tournaments.html">Турниры</a></li>
+       <li><a href="/admin/organizer/stages.html">Этапы</a></li>
+      <li><a href="/admin/organizer/stage-categories.html">Категории</a></li>
+      <li><a href="/admin/organizer/field-rules.html">Поля</a></li>
+      <li><a class="uk-disabled" href="/admin/organizer/squads-import.html">Команды</a></li>
+      <li><a href="/admin/organizer/groups.html">Группы</a></li>
+      <li><a href="/admin/organizer/playoff.html">Плей-офф</a></li>
+      <li><a href="/admin/organizer/schedule.html">Расписание</a></li>
+      <li class="uk-nav-divider"></li>
+      <li><a href="#" id="btnLogoutMobile">Выйти</a></li>
+    </ul>
+  </div>
+</div>
+<!-- /ADMIN HEADER (organizer) -->
+
+<div class="uk-container uk-container-large uk-margin-large-top">
+
+  <div class="uk-flex uk-flex-between uk-flex-middle uk-margin">
+    <h2 class="uk-margin-remove">Команды этапа</h2>
+  </div>
+
+  <!-- подсказки по тренерам -->
+  <datalist id="coachList"></datalist>
+
+  <!-- Выбор этапа + импорт -->
+  <div class="uk-card uk-card-default uk-card-body uk-margin">
+    <div class="uk-grid-small uk-flex-middle" uk-grid>
+      <div class="uk-width-expand">
+        <label class="uk-form-label">Этап</label>
+        <select id="stageSelect" class="uk-select"></select>
+        <div class="uk-text-small uk-text-muted uk-margin-small-top">
+          Выбираешь этап → загружаешь CSV → данные появляются ниже по категориям.
+        </div>
+      </div>
+
+      <div class="uk-width-auto">
+        <label class="uk-form-label">CSV-файл</label>
+        <div class="uk-flex uk-flex-middle uk-grid-small" uk-grid>
+          <div>
+            <input id="file" class="uk-input" type="file" accept=".csv,text/csv">
+          </div>
+          <div>
+            <button id="btnImport" class="uk-button uk-button-primary" type="button">Импорт</button>
+          </div>
+        </div>
+        <div class="uk-text-small uk-text-muted uk-margin-small-top">
+          Формат: матрица с <span class="mono">;</span> как у твоего Excel.
+        </div>
+      </div>
+    </div>
+
+    <div id="importResult" class="uk-margin-top" style="display:none"></div>
+  </div>
+
+  <!-- Категории + список -->
+  <div class="uk-card uk-card-default uk-card-body">
+    <div class="uk-flex uk-flex-between uk-flex-middle uk-margin-small">
+      <h4 class="uk-margin-remove">Список команд</h4>
+      <div class="uk-flex uk-flex-middle uk-grid-small" uk-grid>
+        <button id="btnAdd" class="uk-button uk-button-primary" type="button">
+          <span uk-icon="plus"></span> Добавить
+        </button>
+        <button id="btnBulk" class="uk-button uk-button-secondary" type="button">
+          <span uk-icon="check"></span> Сохранить всё
+        </button>
+        <button id="btnReload" class="uk-button uk-button-default" type="button">Обновить</button>
+      </div>
+    </div>
+
+    <div class="uk-alert-primary uk-margin" uk-alert>
+      <div>
+        После импорта: тренер пустой, рейтинг = 3.
+        Тут же можно править <b>команду/город</b>, рейтинг и тренера (по имени), удалять и добавлять вручную.
+      </div>
+    </div>
+
+    <ul id="catTabs" class="uk-tab" uk-tab></ul>
+    <ul id="catSwitch" class="uk-switcher uk-margin"></ul>
+
+    <div class="uk-text-small uk-text-muted uk-margin-small-top">
+      Подсветка строки = есть несохранённые изменения. Bulk сохраняет только такие строки.
+    </div>
+
+    <div class="uk-text-small uk-text-muted uk-margin-small-top">
+      Ниже можно выбрать связанные команды.
+    </div>
+  </div>
+
+  <!-- Связанные команды / общий лимит нагрузки -->
+  <div class="uk-card uk-card-default uk-card-body uk-margin">
+    <div class="uk-flex uk-flex-between uk-flex-middle uk-margin-small">
+      <h4 class="uk-margin-remove">Связанные команды / общий лимит нагрузки</h4>
+      <div class="uk-flex uk-flex-middle uk-grid-small" uk-grid>
+        <button id="btnSharedAdd" class="uk-button uk-button-primary" type="button">
+          <span uk-icon="plus"></span> Добавить правило
+        </button>
+        <button id="btnSharedReload" class="uk-button uk-button-default" type="button">Обновить</button>
+      </div>
+    </div>
+
+    <div class="uk-alert-warning uk-margin-small" uk-alert>
+      <div class="uk-text-small">
+        Используй это, если один и тот же состав играет в двух возрастах.
+        Например: <b>Команда 2013 + Команда 2014</b>. Тогда генератор будет считать их одной физической командой
+        и сможет ограничивать общую нагрузку по дню.
+      </div>
+    </div>
+
+    <div id="sharedRulesBox"></div>
+
+    <div class="uk-text-small uk-text-muted uk-margin-small-top">
+      Правило действует только в рамках выбранного этапа и должно ссылаться на команды этого этапа.
+    </div>
+  </div>
+
+</div>
+
+<!-- Модалка добавления -->
+<div id="modalAdd" uk-modal>
+  <div class="uk-modal-dialog uk-modal-body">
+    <h3 class="uk-modal-title">Добавить команду</h3>
+
+    <div class="uk-grid-small" uk-grid>
+      <div class="uk-width-1-2@s">
+        <label class="uk-form-label">Команда</label>
+        <input id="addName" class="uk-input" placeholder="например: Космос">
+      </div>
+      <div class="uk-width-1-2@s">
+        <label class="uk-form-label">Город</label>
+        <input id="addCity" class="uk-input" placeholder="например: Краснодар">
+      </div>
+
+      <div class="uk-width-1-3@s">
+        <label class="uk-form-label">Рейтинг</label>
+        <select id="addRating" class="uk-select">
+          <option value="1">1</option>
+          <option value="2">2</option>
+          <option value="3" selected>3</option>
+          <option value="4">4</option>
+        </select>
+      </div>
+
+      <div class="uk-width-2-3@s">
+        <label class="uk-form-label">Тренер (опц.)</label>
+        <input id="addCoach" class="uk-input" list="coachList" placeholder="имя тренера">
+      </div>
+    </div>
+
+    <div class="uk-flex uk-flex-right uk-margin">
+      <button class="uk-button uk-button-default uk-modal-close" type="button">Отмена</button>
+      <button id="btnAddSave" class="uk-button uk-button-primary" type="button">Добавить</button>
+    </div>
+
+    <div class="uk-text-small uk-text-muted">
+      Добавляется в текущий выбранный этап и активную категорию (вкладку).
+    </div>
+  </div>
+</div>
+
+<!-- Модалка связанной нагрузки -->
+<div id="modalSharedRule" uk-modal>
+  <div class="uk-modal-dialog uk-modal-body">
+    <h3 class="uk-modal-title">Добавить правило общей нагрузки</h3>
+
+    <div class="uk-grid-small" uk-grid>
+      <div class="uk-width-1-1">
+        <label class="uk-form-label">Команды этапа</label>
+        <select id="sharedSquads" class="uk-select" multiple size="10"></select>
+        <div class="uk-text-small uk-text-muted uk-margin-small-top">
+          Удерживай Ctrl / Cmd для выбора нескольких команд.
+        </div>
+      </div>
+
+      <div class="uk-width-1-3@s">
+        <label class="uk-form-label">Макс. матчей в день</label>
+        <select id="sharedMaxPerDay" class="uk-select">
+          <option value="1">1</option>
+          <option value="2" selected>2</option>
+          <option value="3">3</option>
+          <option value="4">4</option>
+        </select>
+      </div>
+
+      <div class="uk-width-1-3@s">
+        <label class="uk-form-label">Мин. отдых (слоты)</label>
+        <select id="sharedMinRest" class="uk-select">
+          <option value="0" selected>0</option>
+          <option value="1">1</option>
+          <option value="2">2</option>
+          <option value="3">3</option>
+          <option value="4">4</option>
+        </select>
+      </div>
+
+      <div class="uk-width-1-3@s">
+        <label class="uk-form-label">Комментарий</label>
+        <input id="sharedNote" class="uk-input" placeholder="например: Олимпия один состав">
+      </div>
+    </div>
+
+    <div class="uk-flex uk-flex-right uk-margin">
+      <button class="uk-button uk-button-default uk-modal-close" type="button">Отмена</button>
+      <button id="btnSharedSave" class="uk-button uk-button-primary" type="button">Сохранить</button>
+    </div>
+  </div>
+</div>
+
+<input id="logoFilePicker" type="file" accept="image/png,image/jpeg,image/webp" hidden>
+
+<script>
+(function(){
+  // API
+  const API_STAGES  = '/api/tournament/stages.php';
+  const API_STAGE_CATS = '/api/tournament/stage_categories.php';
+  const API_IMPORT  = '/api/tournament/squads_import_upload.php';
+  const API_SQUADS  = '/api/tournament/squads.php';
+
+  // эти два должны принять club_name/club_city (и дальше сохранить)
+  const API_UPDATE  = '/api/tournament/squad_update.php';
+  const API_ADD     = '/api/tournament/squad_add.php';
+
+  const API_DELETE  = '/api/tournament/squad_delete.php';
+  const API_LOGO_UPLOAD = '/api/tournament/squad_logo_upload.php';
+  const API_LOGO_DELETE = '/api/tournament/squad_logo_delete.php';
+  const API_COACHES = '/api/tournament/coaches.php';
+  const API_SHARED_RULES = '/api/tournament/shared_squad_rules.php';
+  const API_SHARED_RULE_ADD = '/api/tournament/shared_squad_rule_add.php';
+  const API_SHARED_RULE_DELETE = '/api/tournament/shared_squad_rule_delete.php';
+
+  const stageSelect = document.getElementById('stageSelect');
+  const fileInput   = document.getElementById('file');
+  const resultBox   = document.getElementById('importResult');
+
+  const tabs = document.getElementById('catTabs');
+  const sw   = document.getElementById('catSwitch');
+  const sharedRulesBox = document.getElementById('sharedRulesBox');
+  const sharedSquadsSelect = document.getElementById('sharedSquads');
+  const logoFilePicker = document.getElementById('logoFilePicker');
+
+  let currentCategory = null;
+
+  // Категории берём из stage_categories.php (источник истины для этапа).
+  // Если по какой-то причине он вернул пусто — пробуем fallback stage.categories_csv (если есть).
+  const STAGES_BY_ID = new Map();
+  const CATS_CACHE = new Map(); // stageId -> [cat,...]
+  const SQUADS_CACHE = new Map(); // stageId -> {cat:[items]}
+  let CAT_LIST = [];
+
+  async function getCatsForStage(stageId) {
+    const sid = Number(stageId || 0);
+    if (!sid) return [];
+
+    if (CATS_CACHE.has(sid)) return CATS_CACHE.get(sid);
+
+    // 1) primary: stage_categories.php
+    try {
+      const res = await fetch(`${API_STAGE_CATS}?stage_id=${encodeURIComponent(String(sid))}`, {credentials:'same-origin'});
+      const j = await safeJson(res);
+      if (j && Array.isArray(j.rows)) {
+        const out = [];
+        const seen = new Set();
+        for (const r of j.rows) {
+          const n = Number(r.category);
+          if (!Number.isFinite(n)) continue;
+          const key = String(n);
+          if (seen.has(key)) continue;
+          seen.add(key);
+          out.push(key);
+        }
+        if (out.length) {
+          CATS_CACHE.set(sid, out);
+          return out;
+        }
+      }
+    } catch (e) {
+      // ignore and fallback
+    }
+
+    // 2) fallback: categories_csv from stages.php
+    const s = STAGES_BY_ID.get(sid);
+    const csv = (s && s.categories_csv) ? String(s.categories_csv) : '';
+    const raw = csv.split(',').map(v => v.trim()).filter(Boolean);
+    const out = [];
+    const seen = new Set();
+    for (const v of raw) {
+      const n = Number(v);
+      if (!Number.isFinite(n)) continue;
+      const key = String(n);
+      if (seen.has(key)) continue;
+      seen.add(key);
+      out.push(key);
+    }
+    CATS_CACHE.set(sid, out);
+    return out;
+  }
+
+  function notify(msg, status='primary') {
+    UIkit.notification({message: msg, status, pos:'top-right', timeout: 2500});
+  }
+
+  function redirect401(res) {
+    if (res.status === 401) {
+      location.href = '/admin/login.html?next=' + encodeURIComponent(location.pathname);
+      return true;
+    }
+    return false;
+  }
+
+  function escapeHtml(s) {
+    return String(s).replace(/[&<>"']/g, m => ({
+      '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'
+    }[m]));
+  }
+
+  function squadLogoHtml(url) {
+    const u = String(url || '').trim();
+    if (!u) return `<div class="lc-squad-logo-empty">—</div>`;
+    return `<img src="${escapeHtml(u)}?v=${Date.now()}" alt="logo">`;
+  }
+
+  async function safeJson(res) {
+    const txt = await res.text();
+    let j = null;
+    try { j = JSON.parse(txt); } catch(e) {}
+    if (redirect401(res)) return null;
+    if (!res.ok) throw new Error((j && j.error) ? j.error : ('HTTP ' + res.status + ': ' + txt.slice(0, 300)));
+    if (!j || !j.ok) throw new Error((j && j.error) ? j.error : 'bad json/empty response');
+    return j;
+  }
+
+  function markDirty(tr, yes) {
+    tr.dataset.dirty = yes ? '1' : '0';
+    tr.classList.toggle('is-dirty', !!yes);
+  }
+
+  async function loadStages() {
+    const res = await fetch(API_STAGES, {credentials:'same-origin'});
+    const j = await safeJson(res);
+    if (!j) return;
+
+        stageSelect.innerHTML = '';
+    CATS_CACHE.clear();
+    (j.stages || []).forEach(s => {
+      const opt = document.createElement('option');
+      STAGES_BY_ID.set(Number(s.id), s);
+      opt.value = s.id;
+      const title = (s.name && String(s.name).trim()) ? String(s.name).trim() : `Этап #${s.id}`;
+      opt.textContent = `${title} (${s.start_date} — ${s.end_date})`;
+      stageSelect.appendChild(opt);
+    });
+
+    if (stageSelect.options.length && !stageSelect.value) {
+      stageSelect.value = stageSelect.options[0].value;
+    }
+  }
+
+  async function loadCoachesToDatalist() {
+    const dl = document.getElementById('coachList');
+    dl.innerHTML = '';
+    try {
+      const res = await fetch(API_COACHES, {credentials:'same-origin'});
+      const j = await safeJson(res);
+      if (!j) return;
+
+      (j.coaches || []).forEach(c => {
+        const opt = document.createElement('option');
+        opt.value = c.name;
+        dl.appendChild(opt);
+      });
+    } catch(e) {}
+  }
+
+  function showImportResult(j) {
+    const created = j.created ?? 0;
+    const updated = j.updated ?? 0;
+    const skipped = j.skipped ?? 0;
+    const errors = j.errors || [];
+
+    let html = `<div class="uk-alert ${errors.length ? 'uk-alert-warning' : 'uk-alert-success'}" uk-alert>
+      <div>
+        <b>Импорт завершён</b><br>
+        Создано: <span class="mono">${created}</span>,
+        обновлено: <span class="mono">${updated}</span>,
+        пропущено: <span class="mono">${skipped}</span>
+      </div>
+    </div>`;
+
+    if (errors.length) {
+      html += `<div class="uk-card uk-card-default uk-card-body uk-margin-small">
+        <div class="uk-text-bold uk-margin-small-bottom">Ошибки (первые 30)</div>
+        <div class="uk-overflow-auto">
+          <table class="uk-table uk-table-small uk-table-divider">
+            <thead><tr><th>Строка</th><th>Категория</th><th>Ошибка</th></tr></thead><tbody>
+      `;
+      errors.slice(0, 30).forEach(e => {
+        html += `<tr>
+          <td class="mono">${escapeHtml(e.line ?? '')}</td>
+          <td class="mono">${escapeHtml(e.category ?? '')}</td>
+          <td>${escapeHtml(e.error ?? '')}</td>
+        </tr>`;
+      });
+      html += `</tbody></table></div></div>`;
+    }
+
+    resultBox.innerHTML = html;
+    resultBox.style.display = '';
+  }
+
+  async function doImport() {
+    const stageId = Number(stageSelect.value || 0);
+    if (!stageId) { notify('Выбери этап', 'warning'); return; }
+    if (!fileInput.files || !fileInput.files[0]) { notify('Выбери CSV-файл', 'warning'); return; }
+
+    const fd = new FormData();
+    fd.append('stage_id', String(stageId));
+    fd.append('file', fileInput.files[0]);
+
+    const btn = document.getElementById('btnImport');
+    btn.disabled = true;
+
+    try {
+      const res = await fetch(API_IMPORT, {method:'POST', credentials:'same-origin', body: fd});
+      const j = await safeJson(res);
+      if (!j) return;
+
+      showImportResult(j);
+      notify('Импорт выполнен', 'success');
+
+      await loadCoachesToDatalist();
+      await buildCategoryTabsAndLoad(stageId);
+      await loadSharedRules(stageId);
+
+    } catch(e) {
+      notify(e.message || 'Ошибка импорта', 'danger');
+    } finally {
+      btn.disabled = false;
+    }
+  }
+
+  async function fetchSquads(stageId, category) {
+    const url = `${API_SQUADS}?stage_id=${encodeURIComponent(stageId)}&category=${encodeURIComponent(category)}`;
+    const res = await fetch(url, {credentials:'same-origin'});
+    const j = await safeJson(res);
+    if (!j) return [];
+    return j.items || [];
+  }
+
+  async function saveRow(payload) {
+    const res = await fetch(API_UPDATE, {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify(payload)
+    });
+    const j = await safeJson(res);
+    return j;
+  }
+
+  async function deleteRow(id) {
+    const res = await fetch(API_DELETE, {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({id})
+    });
+    const j = await safeJson(res);
+    return j;
+  }
+
+  async function addSquad(stageId, category, name, city, rating, coachName) {
+    const res = await fetch(API_ADD, {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({
+        stage_id: stageId,
+        category: category,
+        club_name: name,
+        club_city: city,
+        name: name,      // fallback на старый бек
+        city: city,      // fallback на старый бек
+        rating: rating,
+        coach_name: coachName
+      })
+    });
+    const j = await safeJson(res);
+    return j;
+  }
+
+
+  async function uploadLogo(squadId, file) {
+    const fd = new FormData();
+    fd.append('squad_id', String(squadId));
+    fd.append('file', file);
+    const res = await fetch(API_LOGO_UPLOAD, {
+      method: 'POST',
+      credentials: 'same-origin',
+      body: fd,
+    });
+    return await safeJson(res);
+  }
+
+  async function deleteLogo(squadId) {
+    const res = await fetch(API_LOGO_DELETE, {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({squad_id: squadId})
+    });
+    return await safeJson(res);
+  }
+
+  function getStageSquadOptions(stageId) {
+    const sid = Number(stageId || 0);
+    const map = SQUADS_CACHE.get(sid) || {};
+    const out = [];
+    const seen = new Set();
+
+    Object.keys(map).forEach(cat => {
+      (map[cat] || []).forEach(it => {
+        const id = Number(it.id || 0);
+        if (!id || seen.has(id)) return;
+        seen.add(id);
+        const name = String(it.club_name || it.name || '').trim();
+        const city = String(it.club_city || '').trim();
+        const label = `${cat} • ${name}${city ? ' (' + city + ')' : ''} • ID ${id}`;
+        out.push({ id, label });
+      });
+    });
+
+    out.sort((a, b) => a.label.localeCompare(b.label, 'ru'));
+    return out;
+  }
+
+  function refillSharedSquadsSelect(stageId) {
+    if (!sharedSquadsSelect) return;
+    const items = getStageSquadOptions(stageId);
+    sharedSquadsSelect.innerHTML = '';
+    items.forEach(it => {
+      const opt = document.createElement('option');
+      opt.value = String(it.id);
+      opt.textContent = it.label;
+      sharedSquadsSelect.appendChild(opt);
+    });
+  }
+
+  function renderSharedRules(items) {
+    let html = `<div class="uk-overflow-auto"><table class="uk-table uk-table-small uk-table-divider uk-table-hover">
+      <thead><tr>
+        <th style="width:90px">ID</th>
+        <th>Команды</th>
+        <th style="width:140px">Макс/день</th>
+        <th style="width:140px">Мин. отдых</th>
+        <th>Комментарий</th>
+        <th style="width:120px"></th>
+      </tr></thead><tbody>`;
+
+    if (!items.length) {
+      html += `<tr><td colspan="6" class="uk-text-muted">Правил пока нет.</td></tr>`;
+    } else {
+      items.forEach(it => {
+let squadNames = '';
+
+if (Array.isArray(it.squads) && it.squads.length) {
+  squadNames = it.squads.map(s => {
+    const n = String(s.name || '').trim();
+    const c = String(s.city || '').trim();
+    const cat = String(s.category || '').trim();
+    return `${cat ? cat + ' • ' : ''}${n}${c ? ' (' + c + ')' : ''}`;
+  }).join('<br>');
+} else {
+  const pretty = String(it.squad_names_text || '').trim();
+  const ids = String(it.squad_ids_text || '').trim();
+
+  squadNames = pretty
+    ? `<div>${escapeHtml(pretty)}</div>${ids ? `` : ''}`
+    : `<span class="uk-text-muted">${escapeHtml(ids)}</span>`;
+}
+        html += `<tr data-id="${escapeHtml(it.id ?? '')}">
+          <td class="mono">${escapeHtml(it.id ?? '')}</td>
+          <td>${squadNames}</td>
+          <td>${escapeHtml(it.max_matches_per_day ?? '')}</td>
+          <td>${escapeHtml(it.min_rest_slots ?? '')}</td>
+          <td>${escapeHtml(it.note ?? '')}</td>
+          <td class="uk-text-right">
+            <button class="uk-button uk-button-danger uk-button-small js-shared-del" type="button">Удалить</button>
+          </td>
+        </tr>`;
+      });
+    }
+
+    html += `</tbody></table></div>`;
+    sharedRulesBox.innerHTML = html;
+
+    sharedRulesBox.querySelectorAll('.js-shared-del').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const tr = btn.closest('tr');
+        const id = Number(tr?.dataset.id || 0);
+        if (!id) return;
+        if (!confirm('Удалить правило общей нагрузки?')) return;
+        btn.disabled = true;
+        try {
+          const res = await fetch(API_SHARED_RULE_DELETE, {
+            method: 'POST',
+            credentials: 'same-origin',
+            headers: {'Content-Type':'application/json'},
+            body: JSON.stringify({id})
+          });
+          await safeJson(res);
+          notify('Правило удалено', 'success');
+          await loadSharedRules(Number(stageSelect.value || 0));
+        } catch (e) {
+          notify(e.message || 'Ошибка удаления правила', 'danger');
+        } finally {
+          btn.disabled = false;
+        }
+      });
+    });
+  }
+
+  async function loadSharedRules(stageId) {
+    const sid = Number(stageId || 0);
+    if (!sid) {
+      sharedRulesBox.innerHTML = '<div class="uk-text-muted">Выбери этап.</div>';
+      return;
+    }
+    try {
+      const res = await fetch(`${API_SHARED_RULES}?stage_id=${encodeURIComponent(String(sid))}`, {credentials:'same-origin'});
+      const j = await safeJson(res);
+      renderSharedRules(j.items || []);
+    } catch (e) {
+      sharedRulesBox.innerHTML = `<div class="uk-alert-danger" uk-alert>${escapeHtml(e.message || 'Не удалось загрузить правила')}</div>`;
+    }
+  }
+
+  async function addSharedRule(stageId, squadIds, maxMatchesPerDay, minRestSlots, note) {
+    const res = await fetch(API_SHARED_RULE_ADD, {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({
+        stage_id: stageId,
+        squad_ids: squadIds,
+        max_matches_per_day: maxMatchesPerDay,
+        min_rest_slots: minRestSlots,
+        note: note
+      })
+    });
+    return await safeJson(res);
+  }
+
+  function renderSquadsTable(items) {
+    let html = `<div class="uk-overflow-auto">
+      <table class="uk-table uk-table-small uk-table-divider uk-table-hover">
+        <thead>
+          <tr>
+            <th style="width:70px">ID</th>
+            <th>Команда</th>
+            <th>Город</th>
+            <th style="width:170px">Лого</th>
+            <th style="width:140px">Рейтинг</th>
+            <th style="width:280px">Тренер</th>
+            <th style="width:220px"></th>
+          </tr>
+        </thead>
+        <tbody>`;
+
+    if (!items.length) {
+      html += `<tr><td colspan="7" class="uk-text-muted">Пока пусто (но можно добавить вручную).</td></tr>`;
+    } else {
+      items.forEach(it => {
+        const id = Number(it.id);
+        const rating = Number(it.rating ?? 3);
+        const coach = (it.coach_name ?? '');
+
+        const clubName = (it.club_name || it.name || '');
+        const clubCity = (it.club_city || '');
+
+        html += `<tr data-id="${id}" data-tournament_id="${escapeHtml(it.tournament_id ?? '')}" data-stage_id="${escapeHtml(it.stage_id ?? '')}" data-category="${escapeHtml(it.category ?? '')}" data-category_variant="${escapeHtml(it.category_variant ?? 1)}" data-dirty="0">
+          <td class="mono">${escapeHtml(id)}</td>
+          <td>
+            <input class="uk-input uk-form-small js-name" value="${escapeHtml(clubName)}" placeholder="Команда">
+          </td>
+          <td>
+            <input class="uk-input uk-form-small js-city" value="${escapeHtml(clubCity)}" placeholder="Город">
+          </td>
+          <td>
+            <div class="lc-squad-logo-box">
+              <div class="lc-squad-logo-preview js-logo-preview">${squadLogoHtml(it.logo_url || '')}</div>
+              <div class="lc-squad-logo-actions">
+                <button class="uk-button uk-button-default uk-button-small js-logo-upload" type="button">Загрузить</button>
+                ${it.logo_url ? '<button class="uk-button uk-button-danger uk-button-small js-logo-del" type="button"><span uk-icon="trash"></span></button>' : ''}
+              </div>
+            </div>
+          </td>
+          <td>
+            <select class="uk-select uk-form-small js-rating">
+              <option value="1"${rating===1?' selected':''}>1</option>
+              <option value="2"${rating===2?' selected':''}>2</option>
+              <option value="3"${rating===3?' selected':''}>3</option>
+              <option value="4"${rating===4?' selected':''}>4</option>
+            </select>
+          </td>
+          <td>
+            <input class="uk-input uk-form-small js-coach" list="coachList" placeholder="тренер (имя)" value="${escapeHtml(coach)}">
+          </td>
+          <td class="uk-text-right btn-row">
+            <button class="uk-button uk-button-primary uk-button-small js-save" type="button">Сохранить</button>
+            <button class="uk-button uk-button-danger uk-button-small js-del" type="button">Удалить</button>
+          </td>
+        </tr>`;
+      });
+    }
+
+    html += `</tbody></table></div>`;
+    html += `<div class="uk-text-small uk-text-muted uk-margin-small-top">
+      Тренер: можно писать просто текстом. Если такого тренера нет — создастся автоматически.
+      Чтобы очистить — оставь поле пустым и сохрани.
+      <br>Удаление удаляет команду <b>из этой категории этапа</b> (не трогая клуб в целом).
+    </div>`;
+    return html;
+  }
+
+  function buildPayloadFromTr(tr) {
+    const id = Number(tr.dataset.id || 0);
+    const tournamentId = Number(tr.dataset.tournament_id || 0);
+    const stageId = Number(tr.dataset.stage_id || 0);
+    const category = String(tr.dataset.category || '');
+    const categoryVariant = Number(tr.dataset.category_variant || 1);
+
+    const clubName = tr.querySelector('.js-name').value.trim();
+    const clubCity = tr.querySelector('.js-city').value.trim();
+
+    const rating = Number(tr.querySelector('.js-rating').value || 3);
+    const coachName = tr.querySelector('.js-coach').value.trim();
+
+    return {
+      id,
+      tournament_id: tournamentId,
+      stage_id: stageId,
+      category,
+      category_variant: categoryVariant,
+      rating,
+      coach_name: coachName,      // чтобы у тебя по имени создавалось как раньше
+      club_name: clubName,
+      club_city: clubCity,
+      name: clubName,             // fallback на старый бек
+      city: clubCity              // fallback на старый бек
+    };
+  }
+
+  function bindTableHandlers(containerEl) {
+    // dirty-tracking
+    containerEl.querySelectorAll('input.js-name, input.js-city, input.js-coach, select.js-rating').forEach(el => {
+      el.addEventListener('input', () => {
+        const tr = el.closest('tr');
+        if (tr) markDirty(tr, true);
+      });
+      el.addEventListener('change', () => {
+        const tr = el.closest('tr');
+        if (tr) markDirty(tr, true);
+      });
+    });
+
+
+    containerEl.querySelectorAll('button.js-logo-upload').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const tr = btn.closest('tr');
+        const squadId = Number(tr?.dataset.id || 0);
+        if (!squadId) return;
+        logoFilePicker.value = '';
+        logoFilePicker.dataset.squadId = String(squadId);
+        logoFilePicker.dataset.stageId = String(tr?.dataset.stage_id || '');
+        logoFilePicker.dataset.category = String(tr?.dataset.category || currentCategory || '');
+        logoFilePicker.click();
+      });
+    });
+
+    containerEl.querySelectorAll('button.js-logo-del').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const tr = btn.closest('tr');
+        const squadId = Number(tr?.dataset.id || 0);
+        const stageId = Number(tr?.dataset.stage_id || stageSelect.value || 0);
+        const category = String(tr?.dataset.category || currentCategory || '');
+        if (!squadId) return;
+        if (!confirm('Удалить логотип?')) return;
+        btn.disabled = true;
+        try {
+          await deleteLogo(squadId);
+          await buildCategoryTabsAndLoad(stageId, category);
+          await loadSharedRules(stageId);
+          notify('Логотип удалён', 'success');
+        } catch (e) {
+          notify(e.message || 'Ошибка удаления логотипа', 'danger');
+        } finally {
+          btn.disabled = false;
+        }
+      });
+    });
+
+    // save single
+    containerEl.querySelectorAll('button.js-save').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const tr = btn.closest('tr');
+        const payload = buildPayloadFromTr(tr);
+
+        if (!payload.club_name || !payload.club_city) {
+          notify('Команда и город обязательны', 'warning');
+          return;
+        }
+
+        btn.disabled = true;
+
+        try {
+          await saveRow(payload);
+          markDirty(tr, false);
+          notify('Сохранено', 'success');
+          await loadCoachesToDatalist();
+        } catch(e) {
+          notify(e.message || 'Ошибка сохранения', 'danger');
+        } finally {
+          btn.disabled = false;
+        }
+      });
+    });
+
+    // delete
+    containerEl.querySelectorAll('button.js-del').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const tr = btn.closest('tr');
+        const id = Number(tr.dataset.id || 0);
+        if (!id) return;
+
+        if (!confirm('Удалить команду из этой категории этапа?')) return;
+
+        btn.disabled = true;
+
+        try {
+          await deleteRow(id);
+          tr.remove();
+          notify('Удалено', 'success');
+        } catch(e) {
+          notify(e.message || 'Ошибка удаления', 'danger');
+        } finally {
+          btn.disabled = false;
+        }
+      });
+    });
+  }
+
+async function buildCategoryTabsAndLoad(stageId, preferredCategory = null) {
+  tabs.innerHTML = '';
+  sw.innerHTML = '';
+
+  CAT_LIST = await getCatsForStage(stageId);
+
+  // если у этапа нет категорий — показываем понятное сообщение
+  if (!CAT_LIST.length) {
+    currentCategory = null;
+
+    tabs.innerHTML = `<li class="uk-disabled"><a href="#">Категории не заданы</a></li>`;
+    sw.innerHTML = `<li>
+      <div class="uk-text-muted uk-margin">
+        Для выбранного этапа нет категорий. Добавь их в разделе «Категории», потом вернись сюда.
+      </div>
+    </li>`;
+
+    UIkit.tab(tabs).show(0);
+    return;
+  }
+
+  // грузим данные параллельно
+  const dataByCat = {};
+  await Promise.all(CAT_LIST.map(async (cat) => {
+    dataByCat[cat] = await fetchSquads(stageId, cat);
+  }));
+  SQUADS_CACHE.set(Number(stageId || 0), dataByCat);
+  refillSharedSquadsSelect(stageId);
+
+  let activeIdx = CAT_LIST.findIndex(cat => String(cat) === String(preferredCategory || ''));
+  if (activeIdx < 0) activeIdx = 0;
+
+  CAT_LIST.forEach((cat, idx) => {
+    const liTab = document.createElement('li');
+    liTab.innerHTML = `<a href="#">${escapeHtml(cat)}</a>`;
+    tabs.appendChild(liTab);
+
+    const liSw = document.createElement('li');
+    liSw.innerHTML = renderSquadsTable(dataByCat[cat] || []);
+    sw.appendChild(liSw);
+
+    bindTableHandlers(liSw);
+
+    if (idx === activeIdx) currentCategory = cat;
+  });
+
+  UIkit.tab(tabs).show(activeIdx);
+
+  tabs.querySelectorAll('a').forEach((a, idx) => {
+    a.addEventListener('click', () => { currentCategory = CAT_LIST[idx]; });
+  });
+}
+
+  // Bulk save: сохраняем только изменённые строки на текущей вкладке
+  async function bulkSaveCurrentTab() {
+    const switcher = UIkit.switcher(sw);
+    const idx = switcher.index();
+    const pane = sw.children[idx];
+    if (!pane) return;
+
+    const dirtyRows = Array.from(pane.querySelectorAll('tr[data-dirty="1"]'));
+    if (!dirtyRows.length) {
+      notify('Нет изменений для сохранения', 'warning');
+      return;
+    }
+
+    // блокируем кнопку на время
+    const btn = document.getElementById('btnBulk');
+    btn.disabled = true;
+
+    let ok = 0, fail = 0;
+
+    try {
+      for (const tr of dirtyRows) {
+        const payload = buildPayloadFromTr(tr);
+
+        if (!payload.club_name || !payload.club_city) {
+          fail++;
+          notify(`ID ${payload.id}: команда/город обязательны`, 'danger');
+          continue;
+        }
+
+        try {
+          await saveRow(payload);
+          markDirty(tr, false);
+          ok++;
+        } catch(e) {
+          fail++;
+          notify(`ID ${payload.id}: ${e.message || 'ошибка'}`, 'danger');
+        }
+      }
+
+      await loadCoachesToDatalist();
+
+      if (fail === 0) notify(`Bulk: сохранено ${ok}`, 'success');
+      else notify(`Bulk: сохранено ${ok}, ошибок ${fail}`, 'warning');
+
+    } finally {
+      btn.disabled = false;
+    }
+  }
+
+
+  if (logoFilePicker) {
+    logoFilePicker.addEventListener('change', async () => {
+      const file = logoFilePicker.files && logoFilePicker.files[0] ? logoFilePicker.files[0] : null;
+      const squadId = Number(logoFilePicker.dataset.squadId || 0);
+      const stageId = Number(logoFilePicker.dataset.stageId || stageSelect.value || 0);
+      const category = String(logoFilePicker.dataset.category || currentCategory || '');
+      if (!file || !squadId || !stageId) return;
+      try {
+        await uploadLogo(squadId, file);
+        await buildCategoryTabsAndLoad(stageId, category);
+        await loadSharedRules(stageId);
+        notify('Логотип загружен', 'success');
+      } catch (e) {
+        notify(e.message || 'Ошибка загрузки логотипа', 'danger');
+      } finally {
+        logoFilePicker.value = '';
+      }
+    });
+  }
+
+  document.getElementById('btnImport').addEventListener('click', doImport);
+
+  document.getElementById('btnReload').addEventListener('click', async () => {
+    const stageId = Number(stageSelect.value || 0);
+    if (!stageId) { notify('Выбери этап', 'warning'); return; }
+    try { await buildCategoryTabsAndLoad(stageId); await loadSharedRules(stageId); }
+    catch(e){ notify(e.message || 'Ошибка обновления', 'danger'); }
+  });
+
+  document.getElementById('btnBulk').addEventListener('click', bulkSaveCurrentTab);
+
+  stageSelect.addEventListener('change', async () => {
+    const stageId = Number(stageSelect.value || 0);
+    if (!stageId) return;
+    resultBox.style.display = 'none';
+    resultBox.innerHTML = '';
+    try {
+      await loadCoachesToDatalist();
+      await buildCategoryTabsAndLoad(stageId);
+      await loadSharedRules(stageId);
+    } catch(e){
+      notify(e.message || 'Ошибка загрузки', 'danger');
+    }
+  });
+
+  // Добавить (модалка)
+  document.getElementById('btnAdd').addEventListener('click', () => {
+    const stageId = Number(stageSelect.value || 0);
+    if (!stageId) { notify('Выбери этап', 'warning'); return; }
+    if (!currentCategory) { notify('Выбери категорию (вкладку)', 'warning'); return; }
+
+    document.getElementById('addName').value = '';
+    document.getElementById('addCity').value = '';
+    document.getElementById('addRating').value = '3';
+    document.getElementById('addCoach').value = '';
+
+    UIkit.modal('#modalAdd').show();
+  });
+
+  document.getElementById('btnAddSave').addEventListener('click', async () => {
+    const stageId = Number(stageSelect.value || 0);
+    const category = currentCategory;
+
+    const name = document.getElementById('addName').value.trim();
+    const city = document.getElementById('addCity').value.trim();
+    const rating = Number(document.getElementById('addRating').value || 3);
+    const coachName = document.getElementById('addCoach').value.trim();
+
+    if (!stageId) { notify('Выбери этап', 'warning'); return; }
+    if (!category) { notify('Выбери категорию', 'warning'); return; }
+    if (!name || !city) { notify('Команда и город обязательны', 'warning'); return; }
+
+    const btn = document.getElementById('btnAddSave');
+    btn.disabled = true;
+
+    try {
+      const j = await addSquad(stageId, category, name, city, rating, coachName);
+
+      UIkit.modal('#modalAdd').hide();
+      notify(j.created ? 'Добавлено' : 'Уже есть', 'success');
+
+      await loadCoachesToDatalist();
+      await buildCategoryTabsAndLoad(stageId);
+
+    } catch(e) {
+      notify(e.message || 'Ошибка добавления', 'danger');
+    } finally {
+      btn.disabled = false;
+    }
+  });
+
+
+  document.getElementById('btnSharedReload').addEventListener('click', async () => {
+    const stageId = Number(stageSelect.value || 0);
+    if (!stageId) { notify('Выбери этап', 'warning'); return; }
+    await loadSharedRules(stageId);
+  });
+
+  document.getElementById('btnSharedAdd').addEventListener('click', () => {
+    const stageId = Number(stageSelect.value || 0);
+    if (!stageId) { notify('Выбери этап', 'warning'); return; }
+    refillSharedSquadsSelect(stageId);
+    Array.from(sharedSquadsSelect.options).forEach(o => o.selected = false);
+    document.getElementById('sharedMaxPerDay').value = '2';
+    document.getElementById('sharedMinRest').value = '0';
+    document.getElementById('sharedNote').value = '';
+    UIkit.modal('#modalSharedRule').show();
+  });
+
+  document.getElementById('btnSharedSave').addEventListener('click', async () => {
+    const stageId = Number(stageSelect.value || 0);
+    if (!stageId) { notify('Выбери этап', 'warning'); return; }
+
+    const squadIds = Array.from(sharedSquadsSelect.selectedOptions).map(o => Number(o.value || 0)).filter(Boolean);
+    const maxMatchesPerDay = Number(document.getElementById('sharedMaxPerDay').value || 2);
+    const minRestSlots = Number(document.getElementById('sharedMinRest').value || 0);
+    const note = document.getElementById('sharedNote').value.trim();
+
+    if (squadIds.length < 2) {
+      notify('Выбери минимум две команды', 'warning');
+      return;
+    }
+
+    const btn = document.getElementById('btnSharedSave');
+    btn.disabled = true;
+    try {
+      await addSharedRule(stageId, squadIds, maxMatchesPerDay, minRestSlots, note);
+      UIkit.modal('#modalSharedRule').hide();
+      notify('Правило сохранено', 'success');
+      await loadSharedRules(stageId);
+    } catch (e) {
+      notify(e.message || 'Ошибка сохранения правила', 'danger');
+    } finally {
+      btn.disabled = false;
+    }
+  });
+
+  (async function init(){
+    try {
+      await loadStages();
+      await loadCoachesToDatalist();
+
+      const stageId = Number(stageSelect.value || 0);
+      if (stageId) {
+        await buildCategoryTabsAndLoad(stageId);
+        await loadSharedRules(stageId);
+      }
+
+    } catch(e) {
+      notify(e.message || 'Ошибка инициализации', 'danger');
+    }
+  })();
+
+})();
+</script>
+
+</body>
+</html>

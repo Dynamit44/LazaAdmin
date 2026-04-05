@@ -1,0 +1,110 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>LazaCup — Admin</title>
+
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/uikit@3.21.12/dist/css/uikit.min.css">
+  <script src="https://cdn.jsdelivr.net/npm/uikit@3.21.12/dist/js/uikit.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/uikit@3.21.12/dist/js/uikit-icons.min.js"></script>
+
+  <style>
+    .brand-badge{
+      width:44px;height:44px;border-radius:12px;
+      background:#0f172a;color:#fff;font-weight:700;
+      display:flex;align-items:center;justify-content:center;
+      letter-spacing:.5px;
+    }
+    .wrap{min-height: calc(100vh - 80px); display:flex; align-items:center;}
+  </style>
+</head>
+<body>
+
+<nav class="uk-navbar-container uk-navbar-transparent uk-padding-small" uk-navbar>
+  <div class="uk-navbar-left">
+    <a class="uk-navbar-item uk-logo" href="/admin/">
+      <span class="brand-badge">LC</span>
+      <span class="uk-margin-small-left">
+        LazaCup <span class="uk-text-muted">Admin</span>
+      </span>
+    </a>
+  </div>
+  <div class="uk-navbar-right">
+    <button id="btnLogout" class="uk-button uk-button-default uk-button-small" type="button" hidden>
+      <span uk-icon="sign-out"></span> Выйти
+    </button>
+  </div>
+</nav>
+
+<div class="uk-container uk-container-small wrap">
+  <div class="uk-card uk-card-default uk-card-body uk-text-center">
+    <div class="uk-text-lead">Проверяю сессию…</div>
+    <div id="status" class="uk-text-muted uk-margin-small-top"></div>
+
+    <div id="actions" class="uk-margin-top" hidden>
+      <a class="uk-button uk-button-primary" href="/admin/login.html">Перейти к логину</a>
+    </div>
+  </div>
+</div>
+
+<script>
+(function(){
+  const API_ME     = '/api/tournament/auth/me.php';
+  const API_LOGOUT = '/api/tournament/auth/logout.php';
+
+  const statusEl  = document.getElementById('status');
+  const actionsEl = document.getElementById('actions');
+  const btnLogout = document.getElementById('btnLogout');
+
+  function nextUrl() {
+    const p = location.pathname + location.search + location.hash;
+    return '/admin/login.html?next=' + encodeURIComponent(p);
+  }
+
+  async function apiMe(){
+    const res = await fetch(API_ME, {credentials:'same-origin', cache:'no-store'});
+    if (res.status === 401) return null;
+    const j = await res.json().catch(()=>null);
+    if (!res.ok || !j || !j.ok) throw new Error(j?.error || ('HTTP ' + res.status));
+    return j.user || null;
+  }
+
+  async function doLogout(){
+    // POST + credentials, чтобы точно прибить сессию
+    await fetch(API_LOGOUT, {
+      method:'POST',
+      credentials:'same-origin',
+      headers:{'Content-Type':'application/json'},
+      body:'{}',
+      cache:'no-store'
+    }).catch(()=>{});
+    location.href = '/admin/login.html';
+  }
+
+  btnLogout.addEventListener('click', doLogout);
+
+  (async function init(){
+    try {
+      const u = await apiMe();
+      if (!u) { location.href = nextUrl(); return; }
+
+      btnLogout.hidden = false;
+      statusEl.textContent = `Вы вошли как ${u.login} (${u.role}). Перехожу в панель…`;
+
+      let dest = '/admin/login.html';
+      if (u.role === 'organizer') dest = '/admin/organizer/';
+      else if (u.role === 'operator') dest = '/admin/operator/';
+
+      setTimeout(()=>{ location.href = dest; }, 150);
+
+    } catch(e) {
+      statusEl.textContent = 'Ошибка: ' + (e.message || 'unknown');
+      actionsEl.hidden = false;
+    }
+  })();
+})();
+</script>
+
+</body>
+</html>

@@ -1,0 +1,574 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>LazaCup — Плей-офф</title>
+
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/uikit@3/dist/css/uikit.min.css">
+  <link rel="stylesheet" href="/admin/_admin.css?v=4">
+
+  <script src="https://cdn.jsdelivr.net/npm/uikit@3/dist/js/uikit.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/uikit@3/dist/js/uikit-icons.min.js"></script>
+
+  <script src="/admin/_admin.js?v=4" defer></script>
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      Admin.initAdminHeader('organizer');
+    });
+  </script>
+</head>
+<body>
+
+<!-- ADMIN HEADER (organizer) -->
+<header class="lc-admin-header uk-background-default uk-box-shadow-small" uk-sticky="show-on-up: true; animation: uk-animation-slide-top">
+  <div class="uk-container uk-container-large">
+    <nav class="uk-navbar-container uk-navbar-transparent" uk-navbar>
+      <div class="uk-navbar-left">
+        <a class="uk-navbar-item uk-logo lc-admin-logo" href="/admin/">
+          <span class="lc-badge">LC</span>
+          <span class="uk-margin-small-left">LazaCup <span class="uk-text-muted">Admin</span></span>
+        </a>
+
+        <ul class="uk-navbar-nav uk-visible@m" id="adminNav">
+          <li><a href="/admin/organizer/tournaments.html">Турниры</a></li>
+          <li><a href="/admin/organizer/stages.html">Этапы</a></li>
+          <li><a href="/admin/organizer/stage-categories.html">Категории</a></li>
+          <li><a href="/admin/organizer/field-rules.html">Поля</a></li>
+          <li><a href="/admin/organizer/squads-import.html">Команды</a></li>
+          <li><a href="/admin/organizer/groups.html">Группы</a></li>
+          <li><a class="uk-disabled" href="/admin/organizer/playoff.html">Плей-офф</a></li>
+          <li><a href="/admin/organizer/schedule.html">Расписание</a></li>
+        </ul>
+      </div>
+
+      <div class="uk-navbar-right">
+        <div class="uk-navbar-item uk-visible@m">
+          <span class="uk-text-small uk-text-muted">Вы:</span>
+          <span id="adminUser" class="uk-text-small uk-margin-small-left">—</span>
+        </div>
+
+        <div class="uk-navbar-item">
+          <button id="btnLogout" class="uk-button uk-button-default" type="button">
+            <span uk-icon="sign-out"></span> Выйти
+          </button>
+        </div>
+
+        <a class="uk-navbar-toggle uk-hidden@m" uk-toggle="target: #adminOffcanvas" href="#">
+          <span uk-navbar-toggle-icon></span>
+        </a>
+      </div>
+    </nav>
+  </div>
+</header>
+
+<div id="adminOffcanvas" uk-offcanvas="overlay: true">
+  <div class="uk-offcanvas-bar">
+    <button class="uk-offcanvas-close" type="button" uk-close></button>
+
+    <div class="uk-margin">
+      <div class="uk-text-small uk-text-muted">Вы:</div>
+      <div id="adminUserMobile">—</div>
+    </div>
+
+    <ul class="uk-nav uk-nav-default" id="adminNavMobile">
+      <li><a href="/admin/organizer/tournaments.html">Турниры</a></li>
+      <li><a href="/admin/organizer/stages.html">Этапы</a></li>
+      <li><a href="/admin/organizer/stage-categories.html">Категории</a></li>
+      <li><a href="/admin/organizer/field-rules.html">Поля</a></li>
+      <li><a href="/admin/organizer/squads-import.html">Команды</a></li>
+      <li><a href="/admin/organizer/groups.html">Группы</a></li>
+      <li><a class="uk-disabled" href="/admin/organizer/playoff.html">Плей-офф</a></li>
+      <li><a href="/admin/organizer/schedule.html">Расписание</a></li>
+      <li class="uk-nav-divider"></li>
+      <li><a href="#" id="btnLogoutMobile">Выйти</a></li>
+    </ul>
+  </div>
+</div>
+<!-- /ADMIN HEADER (organizer) -->
+
+<div class="uk-container uk-container-large uk-margin-large-top">
+
+  <div class="uk-card uk-card-default uk-card-body uk-margin">
+    <div class="uk-grid-small uk-flex-middle" uk-grid>
+      <div class="uk-width-expand@m">
+        <h3 class="uk-margin-remove">Плей-офф — мастер подтверждения</h3>
+        <div class="uk-text-small uk-text-muted">
+          Этот экран работает <b>после формирования групп</b>. Здесь выбираем режим сетки для варианта. Базовые параметры категории (включение и дни) берутся из настроек категорий.
+        </div>
+      </div>
+      <div class="uk-width-1-3@m">
+        <label class="uk-form-label">Этап</label>
+        <select id="stageSelect" class="uk-select"></select>
+      </div>
+    </div>
+
+    <div id="warnBox" class="uk-alert-warning uk-margin uk-hidden" uk-alert>
+      <a class="uk-alert-close" uk-close></a>
+      <div id="warnText"></div>
+    </div>
+  </div>
+
+  <div class="uk-card uk-card-default uk-card-body">
+    <div id="emptyBox" class="uk-text-muted">Выбери этап.</div>
+
+    <div id="tableWrap" class="uk-hidden">
+      <div class="uk-overflow-auto">
+        <table class="uk-table uk-table-small uk-table-divider">
+          <thead>
+            <tr>
+              <th style="width:90px">Категория</th>
+              <th style="width:70px">Вар.</th>
+              <th style="width:160px">Группы</th>
+              <th>По умолчанию (категория)</th>
+              <th style="width:360px">Режим сетки (после групп)</th>
+              <th style="width:160px"></th>
+            </tr>
+          </thead>
+          <tbody id="tbody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+(function(){
+  const API_STAGES = '/api/tournament/stages.php';
+  const API_PLAN   = '/api/tournament/playoff_plan.php';
+  const API_SAVE   = '/api/tournament/playoff_plan_save.php';
+  const API_GENERATE = '/api/tournament/playoff_generate.php';
+  const API_ADVANCE  = '/api/tournament/playoff_advance.php';
+
+  const el = (id) => document.getElementById(id);
+
+  const stageSelect = el('stageSelect');
+  const warnBox  = el('warnBox');
+  const warnText = el('warnText');
+  const emptyBox = el('emptyBox');
+  const tableWrap = el('tableWrap');
+  const tbody = el('tbody');
+
+  function notify(msg, status='primary') {
+    UIkit.notification({message: msg, status, pos:'top-right', timeout: 3000});
+  }
+
+  function redirect401(res) {
+    if (res.status === 401) {
+      location.href = '/admin/login.html?next=' + encodeURIComponent(location.pathname);
+      return true;
+    }
+    return false;
+  }
+
+  async function safeJson(res) {
+    const txt = await res.text();
+    let j = null;
+    try { j = JSON.parse(txt); } catch(e) {}
+
+    if (redirect401(res)) return null;
+
+    if (!res.ok) throw new Error(j?.error || txt.slice(0, 400) || ('HTTP ' + res.status));
+    if (!j || !j.ok) throw new Error(j?.error || 'bad json');
+    return j;
+  }
+
+  // NEW: мягкий JSON для случаев 409/501 без exception
+  async function readJsonAny(res) {
+    const txt = await res.text();
+    let j = null;
+    try { j = JSON.parse(txt); } catch(e) {}
+    return { txt, j };
+  }
+
+  function fmtStage(s) {
+    const name = (s.name && String(s.name).trim()) ? String(s.name).trim() : ('Этап #' + s.id);
+    const cur = (Number(s.is_current) === 1) ? ' ★' : '';
+    return `[${s.tournament_id}] ${name} (${s.start_date} — ${s.end_date})${cur}`;
+  }
+
+  function modeLabel(m) {
+    const map = {
+      none: 'Нет плей-офф',
+      top4_semis_finals: 'Топ-4: 1/2 + финалы (за 1/2 и 3/4)',
+      blocks4_all_places_1g: '1 группа: блоки по 4 (все играют за места)',
+      top2_final_plus_3rd_1g: '1 группа (5 команд): 1–2 финал, 3–4 матч за 3 место',
+      ties_all_places_2g: '2 группы: стыки 1–1, 2–2, 3–3…',
+      blocks4_all_places_2g: '2 группы: блоки по 4 (A1–B2 / B1–A2 и т.д.)',
+      blocks4_all_places_3g: '3 группы: блоки по 4 (защита победителей + топ-8 для вторых)',
+      manual: 'Вручную (нестандартный кейс)'
+    };
+    return map[m] || m;
+  }
+
+  function modeDescription(m) {
+    const map = {
+      none: 'Плей-офф не используется.',
+      top4_semis_finals: 'Четыре лучшие команды выходят в полуфиналы, затем финал и матч за 3 место.',
+      blocks4_all_places_1g: 'Команды одной группы делятся на блоки по 4 и разыгрывают итоговые места.',
+      top2_final_plus_3rd_1g: 'Для группы из 5 команд: 1–2 играют финал, 3–4 — матч за 3 место.',
+      ties_all_places_2g: 'Две группы играют стыковые матчи по одинаковым позициям: 1–1, 2–2, 3–3 и далее.',
+      blocks4_all_places_2g: 'Команды из двух групп собираются в блоки по 4 для розыгрыша всех мест.',
+      blocks4_all_places_3g: 'Три группы перераспределяются в блоки по 4: отдельные ветки для сильнейших и остальных.',
+      manual: 'Сетка задаётся вручную для нестандартных форматов.'
+    };
+    return map[m] || 'Описание режима пока не задано.';
+  }
+
+  function showWarn(msg) {
+    warnText.textContent = msg;
+    warnBox.classList.remove('uk-hidden');
+  }
+  function hideWarn() {
+    warnBox.classList.add('uk-hidden');
+    warnText.textContent = '';
+  }
+
+  let STAGES = [];
+  let currentStageId = 0;
+
+  async function loadStages() {
+    const res = await fetch(API_STAGES, {credentials:'same-origin', cache:'no-store'});
+    const j = await safeJson(res);
+    STAGES = (j.stages || []).map(x => ({...x, id:Number(x.id), is_current:Number(x.is_current)}));
+
+    stageSelect.innerHTML = '';
+    STAGES.forEach(s => {
+      const opt = document.createElement('option');
+      opt.value = s.id;
+      opt.textContent = fmtStage(s);
+      stageSelect.appendChild(opt);
+    });
+
+    const cur = STAGES.find(x => x.is_current === 1);
+    currentStageId = cur ? cur.id : (STAGES[0] ? STAGES[0].id : 0);
+    if (currentStageId) stageSelect.value = String(currentStageId);
+  }
+
+  function render(rows, warnings) {
+    tbody.innerHTML = '';
+
+    if (warnings && warnings.length) {
+      showWarn(warnings.join(' | '));
+    } else {
+      hideWarn();
+    }
+
+    if (!rows || !rows.length) {
+      emptyBox.textContent = 'В этом этапе нет категорий.';
+      emptyBox.classList.remove('uk-hidden');
+      tableWrap.classList.add('uk-hidden');
+      return;
+    }
+
+    emptyBox.classList.add('uk-hidden');
+    tableWrap.classList.remove('uk-hidden');
+
+    rows.forEach(r => {
+      const tr = document.createElement('tr');
+
+      const tdCat = document.createElement('td');
+      tdCat.textContent = r.category;
+
+      const tdVar = document.createElement('td');
+      tdVar.textContent = r.variant;
+
+      const tdGroups = document.createElement('td');
+      if (!r.has_groups) {
+        tdGroups.innerHTML = '<span class="uk-text-muted">нет групп</span>';
+      } else {
+        const parts = (r.groups || []).map(g => `${g.group_code}${g.n}`);
+        tdGroups.textContent = `${r.groups_count} (${parts.join(', ')})`;
+      }
+
+      const tdDef = document.createElement('td');
+      const d = r.defaults || {};
+      tdDef.innerHTML =
+        `<div class="uk-text-small">
+          <div>Плей-офф: <b>${Number(d.playoff_enabled) ? 'да' : 'нет'}</b></div>
+          <div>Дней: <b>${d.playoff_days ?? 0}</b></div>
+          <div>Тип: <b>${(d.playoff_type || '—')}</b></div>
+          <div>Макс матч/день: <b>${d.max_matches_per_day ?? 1}</b></div>
+        </div>`;
+
+      const tdApply = document.createElement('td');
+
+      const applied = r.applied || null;
+      const sug = r.suggested || {};
+
+      const canEdit = !!r.has_groups;
+      const playoffEnabled = Number(d.playoff_enabled || 0) === 1;
+      const recommendedMode = String(r.recommended_mode || sug.playoff_mode || 'none');
+      const allowedItems = (Array.isArray(r.allowed_mode_items) && r.allowed_mode_items.length
+        ? r.allowed_mode_items.map(x => ({
+            id: String(x.id),
+            title: String(x.title || x.id),
+            recommended: Number(x.recommended ? 1 : 0) === 1
+          }))
+        : (r.allowed_modes || ['none']).map(m => ({
+            id: String(m),
+            title: modeLabel(String(m)),
+            recommended: String(m) === recommendedMode
+          }))
+      );
+      const allowedIds = allowedItems.map(x => x.id);
+
+      let curMode = applied ? String(applied.playoff_mode || 'none') : String(sug.playoff_mode || 'none');
+      if (!playoffEnabled) {
+        curMode = 'none';
+      } else if (!allowedIds.includes(curMode)) {
+        curMode = allowedIds.includes(recommendedMode) ? recommendedMode : (allowedIds[0] || 'none');
+      }
+
+      let lastSavedMode = String(curMode);
+
+      const wrap = document.createElement('div');
+      wrap.className = 'uk-grid-small uk-child-width-1-1 uk-flex-middle';
+      wrap.setAttribute('uk-grid','');
+
+      const cMode = document.createElement('div');
+      const sel = document.createElement('select');
+      sel.className = 'uk-select uk-form-small';
+      sel.disabled = !canEdit || !playoffEnabled;
+      allowedItems.forEach(it => {
+        const opt = document.createElement('option');
+        opt.value = it.id;
+        opt.textContent = it.title;
+        if (it.id === curMode) opt.selected = true;
+        if (it.recommended) opt.dataset.recommended = '1';
+        sel.appendChild(opt);
+      });
+      if (!sel.options.length) {
+        const opt = document.createElement('option');
+        opt.value = 'none';
+        opt.textContent = 'Нет плей-офф';
+        opt.selected = true;
+        sel.appendChild(opt);
+      }
+      cMode.appendChild(sel);
+
+      const cInfo = document.createElement('div');
+      const info = document.createElement('div');
+      info.className = 'uk-text-meta uk-margin-small-top';
+      cInfo.appendChild(info);
+
+      function updateModeInfo() {
+        const v = String(sel.value || 'none');
+        const isRecommended = (v === recommendedMode);
+        sel.style.borderColor = isRecommended && playoffEnabled ? '#32d296' : '';
+        sel.style.boxShadow = isRecommended && playoffEnabled ? '0 0 0 1px rgba(50,210,150,.15) inset' : '';
+
+        let txt = modeDescription(v);
+        if (!playoffEnabled) {
+          txt = 'Плей-офф отключён в категории. Чтобы выбрать режим, сначала включи плей-офф в настройках категории.';
+        } else if (r.matrix_note) {
+          txt = txt + ' ' + String(r.matrix_note);
+        }
+        if (playoffEnabled && isRecommended) {
+          txt = txt + ' Рекомендуемый режим для текущего варианта.';
+        }
+        info.textContent = txt;
+      }
+
+      sel.addEventListener('change', updateModeInfo);
+      updateModeInfo();
+
+      wrap.appendChild(cMode);
+      wrap.appendChild(cInfo);
+      tdApply.appendChild(wrap);
+
+      const tdAct = document.createElement('td');
+      tdAct.className = 'uk-text-right';
+
+      const btnSug = document.createElement('button');
+      btnSug.type = 'button';
+      btnSug.className = 'uk-button uk-button-small uk-button-default uk-margin-small-right uk-margin-small-bottom';
+      btnSug.textContent = 'Реком.';
+      btnSug.disabled = !canEdit || !playoffEnabled;
+      btnSug.addEventListener('click', () => {
+        const v = String(recommendedMode || sug.playoff_mode || 'none');
+        [...sel.options].forEach(o => o.selected = (o.value === v));
+        updateModeInfo();
+      });
+
+      const btnSave = document.createElement('button');
+      btnSave.type = 'button';
+      btnSave.className = 'uk-button uk-button-small uk-button-primary uk-margin-small-right';
+      btnSave.textContent = 'Сохранить';
+      btnSave.disabled = !canEdit || !playoffEnabled;
+
+      btnSave.addEventListener('click', async () => {
+        try {
+          btnSave.disabled = true;
+          const newMode = String(sel.value || 'none');
+          const needRegen = (newMode !== String(lastSavedMode));
+
+          const payload = {
+            stage_id: currentStageId,
+            category: r.category,
+            variant: r.variant,
+            groups_count: Number(r.groups_count || (Array.isArray(r.groups) ? r.groups.length : 0) || 0),
+            playoff_mode: newMode,
+          };
+
+          const res = await fetch(API_SAVE, {
+            method: 'POST',
+            credentials: 'same-origin',
+            cache: 'no-store',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify(payload)
+          });
+
+          const j = await safeJson(res);
+          lastSavedMode = newMode;
+
+          notify(
+            'Сохранён режим сетки (групп: ' + (j.groups_count ?? '?') + ')' + (needRegen ? '. Теперь нужно пересоздать матчи.' : ''),
+            needRegen ? 'warning' : 'success'
+          );
+
+          if (needRegen) {
+            UIkit.modal.confirm('Параметры плей-офф изменены. Пересоздать матчи сейчас?')
+              .then(() => btnGen.click())
+              .catch(() => {});
+          }
+        } catch (e) {
+          notify(e.message || 'Ошибка сохранения', 'danger');
+        } finally {
+          btnSave.disabled = !canEdit || !playoffEnabled;
+        }
+      });
+
+      // generate playoff matches into `matches`
+      const btnGen = document.createElement('button');
+      btnGen.type = 'button';
+      btnGen.className = 'uk-button uk-button-secondary uk-button-small uk-margin-small-right uk-margin-small-bottom';
+      btnGen.textContent = 'МАТЧИ';
+      btnGen.disabled = !canEdit || !playoffEnabled;
+      btnGen.addEventListener('click', async () => {
+        if (!currentStageId) return;
+        try {
+          btnGen.disabled = true;
+
+          // IMPORTANT: передаём режим, иначе бек берёт старый mode из БД
+          const payload = {
+            stage_id: currentStageId,
+            category: r.category,
+            variant: r.variant,
+            mode: String(sel.value || 'none'),
+            playoff_mode: String(sel.value || 'none'),
+          };
+
+          const res = await fetch(API_GENERATE, {
+            method: 'POST',
+            headers: {'Content-Type':'application/json'},
+            credentials: 'same-origin',
+            body: JSON.stringify(payload)
+          });
+
+          if (redirect401(res)) return;
+
+          const { j, txt } = await readJsonAny(res);
+
+          // Canon: нужен жребий
+          if (res.status === 409 && j && j.needs_manual) {
+            const gs = Array.isArray(j.needs_manual_groups) ? j.needs_manual_groups.join(', ') : '';
+            notify('Нужен жребий (ручная расстановка) в группах: ' + (gs || '?'), 'danger');
+            console.log('needs_manual_blocks', j.needs_manual_blocks || []);
+            return;
+          }
+
+          // Canon: rank ok, но генерации матчей ещё нет
+          if (res.status === 501) {
+            notify(j?.error || 'Canon: генерация матчей ещё не внедрена (rank ok)', 'warning');
+            return;
+          }
+
+          // любые другие ошибки
+          if (!res.ok) {
+            throw new Error(j?.error || txt.slice(0, 400) || ('HTTP ' + res.status));
+          }
+          if (!j || !j.ok) {
+            throw new Error(j?.error || 'bad json');
+          }
+
+          notify('Плей-офф матчи: создано ' + (j.created||0) + ', удалено ' + (j.deleted||0), 'success');
+        } catch(e) {
+          notify(e.message || 'Ошибка', 'danger');
+        } finally {
+          btnGen.disabled = !canEdit || !playoffEnabled;
+        }
+      });
+
+      // advance placeholders (W:/L: refs) once results are entered
+      const btnAdv = document.createElement('button');
+      btnAdv.type = 'button';
+      btnAdv.className = 'uk-button uk-button-default uk-button-small uk-margin-small-right uk-margin-small-bottom';
+      btnAdv.textContent = 'ОБНОВИТЬ';
+      btnAdv.disabled = !canEdit;
+      btnAdv.addEventListener('click', async () => {
+        if (!currentStageId) return;
+        try {
+          btnAdv.disabled = true;
+          const payload = { stage_id: currentStageId, category: r.category, variant: r.variant };
+          const res = await fetch(API_ADVANCE, {
+            method: 'POST',
+            headers: {'Content-Type':'application/json'},
+            credentials: 'same-origin',
+            body: JSON.stringify(payload)
+          });
+          const j = await safeJson(res);
+          notify('Обновлено участников: ' + (j.updated||0), 'primary');
+        } catch(e) {
+          notify(e.message || 'Ошибка', 'danger');
+        } finally {
+          btnAdv.disabled = !canEdit;
+        }
+      });
+
+      tdAct.appendChild(btnSug);
+      tdAct.appendChild(btnGen);
+      tdAct.appendChild(btnAdv);
+      tdAct.appendChild(btnSave);
+
+      tr.appendChild(tdCat);
+      tr.appendChild(tdVar);
+      tr.appendChild(tdGroups);
+      tr.appendChild(tdDef);
+      tr.appendChild(tdApply);
+      tr.appendChild(tdAct);
+
+      tbody.appendChild(tr);
+    });
+  }
+
+  async function loadPlan(stageId) {
+    const res = await fetch(API_PLAN + '?stage_id=' + encodeURIComponent(stageId), {credentials:'same-origin', cache:'no-store'});
+    const j = await safeJson(res);
+    render(j.rows || [], j.warnings || []);
+  }
+
+  stageSelect.addEventListener('change', async () => {
+    currentStageId = Number(stageSelect.value || 0);
+    if (!currentStageId) return;
+    try {
+      await loadPlan(currentStageId);
+    } catch(e) {
+      notify(e.message || 'Ошибка', 'danger');
+    }
+  });
+
+  (async function init(){
+    try {
+      await loadStages();
+      if (currentStageId) await loadPlan(currentStageId);
+    } catch (e) {
+      notify(e.message || 'Ошибка', 'danger');
+    }
+  })();
+})();
+</script>
+
+</body>
+</html>

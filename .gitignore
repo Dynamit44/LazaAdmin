@@ -1,0 +1,94 @@
+# OS / Windows
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# IDE / Editor
+.idea/
+.vscode/
+*.sublime-workspace
+*.sublime-project
+
+# Logs
+*.log
+logs/
+log/
+*.err
+
+# Temp
+tmp/
+temp/
+*.tmp
+*.bak
+*.swp
+*.swo
+*~
+
+# Cache
+cache/
+_cache/
+.cache/
+system/cache/
+bitrix/cache/
+bitrix/managed_cache/
+bitrix/stack_cache/
+bitrix/html_pages/
+
+# Sessions
+sessions/
+session/
+*.sess
+
+# Upload/service trash
+uploads/tmp/
+upload/tmp/
+
+# Archives / dumps
+*.zip
+*.rar
+*.7z
+*.tar
+*.gz
+*.sql
+*.sql.gz
+*.tgz
+
+# Env / secrets
+.env
+.env.*
+*.key
+*.pem
+secrets.php
+config.local.php
+config.dev.php
+config.private.php
+vk_secrets.php
+
+# Node / frontend
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+dist/
+build/
+
+# Composer
+/vendor/
+composer.phar
+
+# Tests / coverage
+coverage/
+.phpunit.result.cache
+
+# OpenServer / local service files
+.osp/
+OpenServer/
+ospanel_data/
+domains/
+userdata/
+
+# Images/fonts artifacts if generated locally
+*.map
+
+# Git keep-outs
+.git-credentials

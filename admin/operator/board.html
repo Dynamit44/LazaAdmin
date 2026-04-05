@@ -1,0 +1,1001 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>LazaCup — Оператор — Шахматка</title>
+
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/uikit@3/dist/css/uikit.min.css">
+  <link rel="stylesheet" href="/admin/_admin.css?v=4">
+
+  <script src="https://cdn.jsdelivr.net/npm/uikit@3/dist/js/uikit.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/uikit@3/dist/js/uikit-icons.min.js"></script>
+   <script src="/admin/_admin.js?v=4" defer></script>
+   <script>
+     document.addEventListener('DOMContentLoaded', () => {
+       Admin.initAdminHeader('organizer','operator');
+     });
+   </script>
+
+
+  <style>
+    .lc-team-inline { display:inline-flex; align-items:center; gap:8px; }
+    .lc-team-logo { width:20px; height:20px; object-fit:contain; flex:0 0 20px; border-radius:4px; background:#fff; }
+    .lc-playoff-row { border-top:1px solid #e5e5e5; padding:12px 0; }
+    .lc-playoff-row:first-child { border-top:0; padding-top:0; }
+    .lc-playoff-name { min-width:120px; font-weight:600; }
+    .lc-playoff-teams { min-width:260px; }
+    .lc-playoff-score { display:flex; align-items:center; gap:6px; flex-wrap:wrap; }
+    .lc-playoff-score input { width:72px; }
+    .lc-playoff-penalty { display:none; align-items:center; gap:6px; flex-wrap:wrap; }
+    .lc-playoff-penalty.is-visible { display:flex; }
+  </style>
+
+</head>
+<body class="uk-background-muted">
+
+<header class="lc-admin-header">
+  <div class="uk-container uk-container-expand">
+    <nav class="uk-navbar-container uk-navbar-transparent" uk-navbar>
+      <div class="uk-navbar-left">
+        <a class="uk-navbar-item uk-logo" href="/admin/operator/">
+          <span class="lc-logo">LC</span>
+          <span class="uk-margin-small-left">LazaCup</span>
+          <span class="lc-operator-badge">оператор</span>
+        </a>
+
+        <ul class="uk-navbar-nav uk-visible@m" id="adminNav">
+          <li><a href="/admin/operator/index.html">Оператор</a></li>
+          <li><a class="uk-disabled" href="/admin/operator/board.html">Шахматка</a></li>
+          <li><a href="/admin/operator/schedule.html">Расписание</a></li>
+          <li><a href="/admin/operator/publish.html">Публикация</a></li>
+        </ul>
+
+      </div>
+      <div class="uk-navbar-right">
+        <div class="uk-navbar-item uk-visible@m">
+          <span class="uk-text-small uk-text-muted">Вы:</span>
+          <span id="adminUser" class="uk-text-small uk-margin-small-left">—</span>
+        </div>
+
+        <div data-show-for="organizer" class="uk-navbar-item">
+            <a class="uk-navbar-toggle" uk-toggle="target: #adminOffcanvas" href="#">
+               <span uk-navbar-toggle-icon></span>
+            </a>
+            <div id="adminOffcanvas" uk-offcanvas="overlay: true">
+               <div class="uk-offcanvas-bar">
+                 <button class="uk-offcanvas-close" type="button" uk-close></button>
+                 <ul class="uk-nav uk-nav-default" id="adminNavMobile">
+                   <li><a href="/admin/organizer">Админ</a></li>
+                   <li><a href="/admin/organizer/tournaments.html">Турниры</a></li>
+                   <li><a href="/admin/organizer/stages.html">Этапы</a></li>
+                   <li><a href="/admin/organizer/stage-categories.html">Категории</a></li>
+                   <li><a href="/admin/organizer/field-rules.html">Поля</a></li>
+                   <li><a href="/admin/organizer/squads-import.html">Команды</a></li>
+                   <li><a href="/admin/organizer/groups.html">Группы</a></li>
+                   <li><a href="/admin/organizer/playoff.html">Плей-офф</a></li>
+                   <li><a href="/admin/organizer/schedule.html">Расписание</a></li>
+                 </ul>
+               </div>
+            </div>
+         </div>
+
+        <div class="uk-navbar-item">
+          <button id="btnLogout" class="uk-button uk-button-default" type="button">
+            <span uk-icon="sign-out"></span> Выйти
+          </button>
+        </div>
+    </nav>
+  </div>
+</header>
+
+<main class="uk-container uk-container-expand uk-padding-small">
+  <div class="uk-card uk-card-default uk-card-body">
+    <div class="uk-flex uk-flex-between uk-flex-middle uk-margin-small-bottom">
+      <div>
+        <div class="uk-h4 uk-margin-remove">Шахматка</div>
+        <div id="stageLine" class="uk-text-meta"></div>
+      </div>
+    </div>
+
+    <div id="catsBlock" class="uk-margin"></div>
+    <div id="contentBlock"></div>
+  </div>
+</main>
+
+<div id="modalScore" uk-modal>
+  <div class="uk-modal-dialog uk-modal-body">
+    <h3 class="uk-modal-title" id="mTitle">Матч</h3>
+
+    <div class="uk-grid-small" uk-grid>
+      <div class="uk-width-1-2">
+        <label class="uk-form-label" id="mLeftName">Команда 1</label>
+        <input id="mLeftGoals" class="uk-input" type="number" min="0" max="99" placeholder="голы">
+      </div>
+      <div class="uk-width-1-2">
+        <label class="uk-form-label" id="mRightName">Команда 2</label>
+        <input id="mRightGoals" class="uk-input" type="number" min="0" max="99" placeholder="голы">
+      </div>
+    </div>
+
+    <div class="uk-flex uk-flex-between uk-flex-middle uk-margin-top">
+      <button class="uk-button uk-button-default uk-modal-close" type="button">Отмена</button>
+      <div class="uk-flex uk-flex-middle uk-grid-small" uk-grid>
+        <button class="uk-button uk-button-danger" type="button" id="btnClear">Очистить</button>
+        <button class="uk-button uk-button-primary" type="button" id="btnSave">Сохранить</button>
+      </div>
+    </div>
+
+    <input type="hidden" id="mMatchId">
+    <input type="hidden" id="mRowId">
+    <input type="hidden" id="mColId">
+    <input type="hidden" id="mHomeId">
+    <input type="hidden" id="mAwayId">
+  </div>
+</div>
+
+
+<div id="modalManual" uk-modal>
+  <div class="uk-modal-dialog uk-modal-body">
+    <h3 class="uk-modal-title" id="mmTitle">Ручная расстановка</h3>
+
+    <div class="uk-text-meta uk-margin-small-bottom">
+      Перетаскивай команды вверх/вниз (для полной ничьей это и есть «жребий»).
+    </div>
+
+    <ul id="mmList" class="uk-list uk-list-divider lc-sortable" uk-sortable="handle: .lc-handle"></ul>
+
+    <div class="uk-flex uk-flex-between uk-flex-middle uk-margin-top">
+      <button class="uk-button uk-button-default uk-modal-close" type="button">Закрыть</button>
+      <div class="uk-flex uk-flex-middle uk-grid-small" uk-grid>
+        <button class="uk-button uk-button-danger" type="button" id="mmClear">Сбросить</button>
+        <button class="uk-button uk-button-primary" type="button" id="mmSave">Сохранить</button>
+      </div>
+    </div>
+
+    <input type="hidden" id="mmGroup">
+  </div>
+</div>
+
+<script>
+(() => {
+  const API_CURRENT = '/api/tournament/current.php';
+  const API_PUBLIC  = '/api/tournament/public.php';
+  const API_SAVE    = '/api/tournament/result_save.php';
+  const API_PLACES  = '/api/tournament/group_places_save.php';
+
+  const el = (id) => document.getElementById(id);
+
+  function notify(msg, status='primary') {
+    UIkit.notification({message: msg, status, pos:'top-right', timeout: 2500});
+  }
+
+  async function apiGet(url) {
+    const r = await fetch(url, {credentials:'same-origin'});
+    if (r.status === 401) { location.href = '/admin/login.html'; return null; }
+    const j = await r.json().catch(() => null);
+    if (!j || j.ok !== true) throw new Error((j && j.error) ? j.error : 'API error');
+    return j;
+  }
+
+  async function apiPost(url, data) {
+    const r = await fetch(url, {
+      method:'POST',
+      credentials:'same-origin',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify(data)
+    });
+    if (r.status === 401) { location.href = '/admin/login.html'; return null; }
+    const j = await r.json().catch(() => null);
+    if (!j || j.ok !== true) throw new Error((j && j.error) ? j.error : 'API error');
+    return j;
+  }
+
+  let CURRENT = null;
+  let CATS = [];
+  let ACTIVE_CAT = null;
+  let ACTIVE_VARIANT = 1;
+  let GROUP_STATE = {}; // group_code -> {teams:[], usedManual:bool}
+
+  function buildTabs() {
+    if (!CATS.length) {
+      el('catsBlock').innerHTML = '<div class="uk-alert uk-alert-warning">Нет категорий для этапа.</div>';
+      return;
+    }
+
+    const tabs = CATS.map((c, idx) =>
+      `<li class="${idx===0?'uk-active':''}"><a href="#" data-cat="${c.category}">${c.category}</a></li>`
+    ).join('');
+
+    el('catsBlock').innerHTML = `
+      <ul class="uk-tab" id="catTabs">${tabs}</ul>
+    `;
+
+    el('catTabs').addEventListener('click', (e) => {
+      const a = e.target.closest('a[data-cat]');
+      if (!a) return;
+      e.preventDefault();
+      ACTIVE_CAT = a.dataset.cat;
+      [...el('catTabs').querySelectorAll('li')].forEach(li => li.classList.remove('uk-active'));
+      a.parentElement.classList.add('uk-active');
+      loadVariantsAndRender();
+    });
+
+    ACTIVE_CAT = CATS[0].category;
+  }
+
+  async function loadVariantsAndRender() {
+    const vj = await apiGet(`${API_PUBLIC}?type=variants&stage_id=${CURRENT.stage.id}&category=${encodeURIComponent(ACTIVE_CAT)}`);
+    const variants = vj.items || [1];
+    ACTIVE_VARIANT = variants[0] || 1;
+
+    const pills = variants.map((v, idx) =>
+      `<button class="uk-button ${idx===0?'uk-button-primary':'uk-button-default'} uk-button-small" data-variant="${v}">Вариант ${v}</button>`
+    ).join(' ');
+
+    el('contentBlock').innerHTML = `
+      <div class="uk-margin-small-bottom uk-flex uk-flex-between uk-flex-middle">
+        <div class="uk-text-meta">Категория: <b>${ACTIVE_CAT}</b></div>
+        <div id="variantPills">${pills}</div>
+      </div>
+      <div id="boardsArea"></div>
+    `;
+
+    el('variantPills').addEventListener('click', (e) => {
+      const b = e.target.closest('button[data-variant]');
+      if (!b) return;
+      [...el('variantPills').querySelectorAll('button')].forEach(x => {
+        x.classList.remove('uk-button-primary'); x.classList.add('uk-button-default');
+      });
+      b.classList.add('uk-button-primary'); b.classList.remove('uk-button-default');
+      ACTIVE_VARIANT = parseInt(b.dataset.variant, 10) || 1;
+      renderBoards();
+    });
+
+    await renderBoards();
+  }
+
+  function keyPair(a,b) { return (a<b) ? `${a}:${b}` : `${b}:${a}`; }
+
+  function isPlayed(m) {
+    const hg = m.home_goals;
+    const ag = m.away_goals;
+    return !(hg === null || hg === undefined || hg === '' || ag === null || ag === undefined || ag === '');
+  }
+
+  function computeOverallStats(teams, byPair) {
+    const st = {};
+    const nameById = {};
+    const posById = {};
+
+    (teams || []).forEach((t, idx) => {
+      const id = parseInt(t.id, 10) || 0;
+      if (!id) return;
+      st[id] = { pts: 0, wins: 0, gf: 0, ga: 0, played: 0, place: 0 };
+      nameById[id] = String(t.name || '');
+      const rawPos = (t.pos === undefined || t.pos === null) ? (idx + 1) : Number(t.pos);
+      posById[id] = (Number.isFinite(rawPos) && rawPos > 0) ? rawPos : (idx + 1);
+    });
+
+    const n = (teams || []).length;
+    for (let i = 0; i < n; i++) {
+      const aId = parseInt(teams[i].id, 10) || 0;
+      if (!aId) continue;
+      for (let j = i + 1; j < n; j++) {
+        const bId = parseInt(teams[j].id, 10) || 0;
+        if (!bId) continue;
+
+        const m = byPair.get(keyPair(aId, bId));
+        if (!m || !isPlayed(m)) continue;
+
+        const hg = Number(m.home_goals);
+        const ag = Number(m.away_goals);
+        if (!Number.isFinite(hg) || !Number.isFinite(ag)) continue;
+
+        const hId = parseInt(m.home_squad_id, 10) || 0;
+        const awId = parseInt(m.away_squad_id, 10) || 0;
+        const hs = st[hId];
+        const as = st[awId];
+        if (!hs || !as) continue;
+
+        hs.played++; as.played++;
+        hs.gf += hg; hs.ga += ag;
+        as.gf += ag; as.ga += hg;
+
+        if (hg > ag) {
+          hs.pts += 3; hs.wins += 1;
+        } else if (hg < ag) {
+          as.pts += 3; as.wins += 1;
+        } else {
+          hs.pts += 1; as.pts += 1;
+        }
+      }
+    }
+
+    return { st, nameById, posById };
+  }
+
+  function computeH2HStats(ids, byPair) {
+    const out = {};
+    ids.forEach(id => {
+      out[id] = { pts: 0, wins: 0, gf: 0, ga: 0 };
+    });
+
+    const n = ids.length;
+    for (let i = 0; i < n; i++) {
+      for (let j = i + 1; j < n; j++) {
+        const aId = ids[i], bId = ids[j];
+        const m = byPair.get(keyPair(aId, bId));
+        if (!m || !isPlayed(m)) continue;
+
+        const hg = Number(m.home_goals);
+        const ag = Number(m.away_goals);
+        if (!Number.isFinite(hg) || !Number.isFinite(ag)) continue;
+
+        const hId = parseInt(m.home_squad_id, 10) || 0;
+        const awId = parseInt(m.away_squad_id, 10) || 0;
+
+        if (!out[hId] || !out[awId]) continue;
+
+        out[hId].gf += hg; out[hId].ga += ag;
+        out[awId].gf += ag; out[awId].ga += hg;
+
+        if (hg > ag) {
+          out[hId].pts += 3; out[hId].wins += 1;
+        } else if (hg < ag) {
+          out[awId].pts += 3; out[awId].wins += 1;
+        } else {
+          out[hId].pts += 1; out[awId].pts += 1;
+        }
+      }
+    }
+
+    return out;
+  }
+
+  function makeKey(over, h2h) {
+    const gd = (over.gf || 0) - (over.ga || 0);
+    const hgd = (h2h.gf || 0) - (h2h.ga || 0);
+    return [
+      over.pts || 0,
+      over.wins || 0,
+      h2h.pts || 0,
+      h2h.wins || 0,
+      hgd,
+      h2h.gf || 0,
+      gd,
+      over.gf || 0,
+    ].join('|');
+  }
+
+  function detectHardTies(sortedTeams, overallMap, h2hMap) {
+    for (let i = 1; i < sortedTeams.length; i++) {
+      const a = sortedTeams[i - 1];
+      const b = sortedTeams[i];
+      const oa = overallMap[a.id] || { pts:0,wins:0,gf:0,ga:0 };
+      const ob = overallMap[b.id] || { pts:0,wins:0,gf:0,ga:0 };
+      if (oa.pts !== ob.pts || oa.wins !== ob.wins) continue;
+
+      const ha = h2hMap[a.id] || { pts:0,wins:0,gf:0,ga:0 };
+      const hb = h2hMap[b.id] || { pts:0,wins:0,gf:0,ga:0 };
+
+      if (makeKey(oa, ha) === makeKey(ob, hb)) return true;
+    }
+    return false;
+  }
+
+  function sortTeamsAuto(baseTeams, byPair) {
+    const { st: overall, nameById, posById } = computeOverallStats(baseTeams, byPair);
+
+    const buckets = new Map();
+    for (const t of baseTeams) {
+      const s = overall[t.id] || { pts:0, wins:0 };
+      const k = `${s.pts}|${s.wins}`;
+      if (!buckets.has(k)) buckets.set(k, []);
+      buckets.get(k).push(t.id);
+    }
+
+    const h2h = {};
+    for (const ids of buckets.values()) {
+      if (ids.length <= 1) continue;
+      const sub = computeH2HStats(ids, byPair);
+      for (const id of ids) h2h[id] = sub[id];
+    }
+
+    const teams = baseTeams.slice().sort((a, b) => {
+      const oa = overall[a.id] || { pts:0, wins:0, gf:0, ga:0 };
+      const ob = overall[b.id] || { pts:0, wins:0, gf:0, ga:0 };
+
+      const gdA = (oa.gf || 0) - (oa.ga || 0);
+      const gdB = (ob.gf || 0) - (ob.ga || 0);
+
+      if ((ob.pts || 0) !== (oa.pts || 0)) return (ob.pts || 0) - (oa.pts || 0);
+      if ((ob.wins || 0) !== (oa.wins || 0)) return (ob.wins || 0) - (oa.wins || 0);
+
+      const ha = h2h[a.id] || { pts:0, wins:0, gf:0, ga:0 };
+      const hb = h2h[b.id] || { pts:0, wins:0, gf:0, ga:0 };
+      const hgdA = (ha.gf || 0) - (ha.ga || 0);
+      const hgdB = (hb.gf || 0) - (hb.ga || 0);
+
+      if ((hb.pts || 0) !== (ha.pts || 0)) return (hb.pts || 0) - (ha.pts || 0);
+      if ((hb.wins || 0) !== (ha.wins || 0)) return (hb.wins || 0) - (ha.wins || 0);
+      if (hgdB !== hgdA) return hgdB - hgdA;
+      if ((hb.gf || 0) !== (ha.gf || 0)) return (hb.gf || 0) - (ha.gf || 0);
+
+      if (gdB !== gdA) return gdB - gdA;
+      if ((ob.gf || 0) !== (oa.gf || 0)) return (ob.gf || 0) - (oa.gf || 0);
+
+      return (posById[a.id] || 0) - (posById[b.id] || 0) ||
+        String(nameById[a.id] || '').localeCompare(String(nameById[b.id] || ''), 'ru');
+    });
+
+    const hardTie = detectHardTies(teams, overall, h2h);
+
+    teams.forEach((t, idx) => {
+      if (overall[t.id]) overall[t.id].place = idx + 1;
+    });
+
+    return { teams, standings: overall, hardTie, usedManual: false };
+  }
+
+  function sortTeamsWithManual(baseTeams, byPair) {
+    const { st: overall, posById } = computeOverallStats(baseTeams, byPair);
+
+    const teams = baseTeams.slice().sort((a, b) => {
+      const ma = (a.manual_place === null || a.manual_place === undefined) ? 9999 : Number(a.manual_place);
+      const mb = (b.manual_place === null || b.manual_place === undefined) ? 9999 : Number(b.manual_place);
+      if (ma !== mb) return ma - mb;
+      return (posById[a.id] || 0) - (posById[b.id] || 0);
+    });
+
+    teams.forEach((t, idx) => { if (overall[t.id]) overall[t.id].place = idx + 1; });
+    return { teams, standings: overall, hardTie: false, usedManual: true };
+  }
+
+  async function renderBoards() {
+    const bj = await apiGet(`${API_PUBLIC}?type=board&stage_id=${CURRENT.stage.id}&category=${encodeURIComponent(ACTIVE_CAT)}&variant=${ACTIVE_VARIANT}`);
+    const groups = bj.groups || {};
+    const matches = bj.matches || [];
+    const playoffMatches = bj.playoff_matches || [];
+
+    const byPair = new Map();
+    for (const m of matches) {
+      const a = parseInt(m.home_squad_id,10);
+      const b = parseInt(m.away_squad_id,10);
+      byPair.set(keyPair(a,b), m);
+    }
+
+    GROUP_STATE = {};
+
+    const groupCodes = Object.keys(groups).sort();
+    if (!groupCodes.length) {
+      el('boardsArea').innerHTML = `<div class="uk-alert uk-alert-warning">Группы не найдены.</div>`;
+      return;
+    }
+    if (!matches.length) {
+      el('boardsArea').innerHTML = `<div class="uk-alert uk-alert-warning">Матчи ещё не созданы (таблица matches пустая для этой категории/варианта).</div>`;
+      return;
+    }
+
+    let html = '<div class="uk-grid uk-grid-medium uk-grid-match uk-child-width-1-1 uk-child-width-1-2@l" uk-grid>';
+
+    for (const g of groupCodes) {
+      const baseTeams = (groups[g] || []).slice().sort((x,y)=> (x.pos||0)-(y.pos||0));
+
+      const hasManual = baseTeams.some(t => t.manual_place !== null && t.manual_place !== undefined && String(t.manual_place) !== '');
+      const r = hasManual ? sortTeamsWithManual(baseTeams, byPair) : sortTeamsAuto(baseTeams, byPair);
+
+      const teams = r.teams;
+      const standings = r.standings;
+      const usedManual = r.usedManual;
+      const hardTie = r.hardTie;
+
+      GROUP_STATE[g] = { teams: teams.map(t => ({...t})), usedManual };
+
+      const n = teams.length;
+
+      const headNums = teams.map((t, i)=> `<th>${i+1}</th>`).join('')
+        + '<th class="stat stat-pts">О</th>'
+        + '<th class="stat stat-gfga">З-ПР</th>'
+        + '<th class="stat stat-place">М</th>';
+
+      const manualBadge = usedManual ? '<span class="lc-manual-badge" title="Включена ручная расстановка">ручн.</span>' : '';
+      const warn = (!usedManual && hardTie)
+        ? `<div class="uk-alert uk-alert-warning uk-margin-small lc-alert-tight">
+             Полная ничья по всем критериям. Нужна <b>ручная расстановка</b> (жребий).
+           </div>`
+        : '';
+
+      let rows = '';
+      for (let i=0;i<n;i++) {
+        const rowT = teams[i];
+        const st = standings[rowT.id] || { pts:0, wins:0, gf:0, ga:0, played:0, place: '—' };
+
+        const cells = [];
+        for (let j=0;j<n;j++) {
+          const colT = teams[j];
+
+          if (i === j) {
+            cells.push(`<td class="board-ballets"><span class="uk-text-muted"></span></td>`);
+            continue;
+          }
+
+          const m = byPair.get(keyPair(rowT.id, colT.id));
+          if (!m) {
+            cells.push(`<td><span class="cell-empty">…</span></td>`);
+            continue;
+          }
+
+          const homeId = parseInt(m.home_squad_id,10);
+          const awayId = parseInt(m.away_squad_id,10);
+          const hg = (m.home_goals === null || m.home_goals === undefined) ? null : parseInt(m.home_goals,10);
+          const ag = (m.away_goals === null || m.away_goals === undefined) ? null : parseInt(m.away_goals,10);
+
+          let txt = '';
+          if (hg !== null && ag !== null) {
+            txt = (rowT.id === homeId) ? `${hg}:${ag}` : `${ag}:${hg}`;
+          } else {
+            txt = '';
+          }
+
+          const cellId = `cell-${g}-${rowT.id}-${colT.id}`;
+          cells.push(`
+            <td>
+              <button
+                class="uk-button uk-button-text uk-padding-remove cell-btn"
+                id="${cellId}"
+                data-group="${g}"
+                data-row="${rowT.id}"
+                data-col="${colT.id}"
+                data-match="${m.id}"
+                data-home="${homeId}"
+                data-away="${awayId}"
+                data-rowname="${escapeHtml(rowT.name)}"
+                data-colname="${escapeHtml(colT.name)}"
+              >${txt || '<span class="cell-empty">&nbsp;</span>'}</button>
+            </td>
+          `);
+        }
+
+        rows += `
+          <tr>
+            <th class="left">${i+1}. ${teamLabelHtml(rowT)}</th>
+            ${cells.join('')}
+            <td class="stat stat-pts">${st.pts}</td>
+            <td class="stat stat-gfga">${st.gf}:${st.ga}</td>
+            <td class="stat stat-place">${st.place}</td>
+          </tr>
+        `;
+      }
+
+      // ✅ ИЗМЕНЕНО: кнопка "Сбросить" появляется только если usedManual=true
+      html += `
+        <div>
+          <div class="uk-card uk-card-default uk-card-body">
+            <div class="uk-flex uk-flex-between uk-flex-middle uk-margin-small-bottom">
+              <div class="uk-h5 uk-margin-remove">Группа ${escapeHtml(g)} (${n}) ${manualBadge}</div>
+
+              <div class="uk-button-group">
+                <button class="uk-button uk-button-default uk-button-small btn-manual"
+                        type="button"
+                        data-action="manual"
+                        data-group="${escapeHtml(g)}">Ручная расстановка</button>
+
+                ${usedManual ? `
+                  <button class="uk-button uk-button-danger uk-button-small"
+                          type="button"
+                          data-action="manual-clear"
+                          data-group="${escapeHtml(g)}">Сбросить</button>
+                ` : ``}
+              </div>
+            </div>
+
+            ${warn}
+
+            <div class="board-wrap">
+              <table class="uk-table uk-table-small uk-table-divider board">
+                <thead>
+                  <tr>
+                    <th class="left">Команды</th>
+                    ${headNums}
+                  </tr>
+                </thead>
+                <tbody>${rows}</tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
+    html += '</div>';
+    html += renderPlayoffBlock(playoffMatches);
+    el('boardsArea').innerHTML = html;
+
+    el('boardsArea').querySelectorAll('button[data-match]').forEach(btn => {
+      btn.addEventListener('click', () => openModal(btn));
+    });
+
+    el('boardsArea').querySelectorAll('button[data-action="manual"]').forEach(btn => {
+      btn.addEventListener('click', () => openManualModal(btn.dataset.group));
+    });
+
+    // ✅ НОВОЕ: сброс ручной расстановки из карточки группы
+    el('boardsArea').querySelectorAll('button[data-action="manual-clear"]').forEach(btn => {
+      btn.addEventListener('click', () => clearManual(btn.dataset.group));
+    });
+
+    bindPlayoffActions();
+  }
+
+  function playoffName(code) {
+    const c = String(code || '').trim();
+    if (c === 'F') return 'Финал';
+    if (c === '3') return 'Матч за 3 место';
+    const map = {
+      'P1-4-F': 'Финал 1–4',
+      'P1-4-3': 'Матч за 3 место (1–4)',
+      'P5-8-F': 'Финал 5–8',
+      'P5-8-3': 'Матч за 7 место',
+      'P9-12-F': 'Финал 9–12',
+      'P9-12-3': 'Матч за 11 место'
+    };
+    if (map[c]) return map[c];
+    let m = c.match(/^P(\d+)-(\d+)-SF(\d+)$/);
+    if (m) return `ПФ${m[3]} (${m[1]}–${m[2]})`;
+    m = c.match(/^P(\d+)-(\d+)-F$/);
+    if (m) return `Финал ${m[1]}–${m[2]}`;
+    m = c.match(/^P(\d+)-(\d+)-3$/);
+    if (m) return `Матч за места ${m[1]}–${m[2]}`;
+    return c || 'Матч';
+  }
+
+  function playoffTeamText(row, side) {
+    const squadName = String(row[side + '_name'] || '').trim();
+    if (squadName) return squadName;
+    const label = String(row[side + '_label'] || '').trim();
+    if (label) return label;
+    const ref = String(row[side + '_ref'] || '').trim();
+    if (ref) return ref;
+    return '—';
+  }
+
+  function renderPlayoffBlock(items) {
+    if (!items.length) return '';
+
+    const rows = items.map((m) => {
+      const hg = (m.home_goals === null || m.home_goals === undefined || m.home_goals === '') ? '' : String(m.home_goals);
+      const ag = (m.away_goals === null || m.away_goals === undefined || m.away_goals === '') ? '' : String(m.away_goals);
+      const hpg = (m.home_pen_goals === null || m.home_pen_goals === undefined || m.home_pen_goals === '') ? '' : String(m.home_pen_goals);
+      const apg = (m.away_pen_goals === null || m.away_pen_goals === undefined || m.away_pen_goals === '') ? '' : String(m.away_pen_goals);
+      const penVisible = (hg !== '' && ag !== '' && hg === ag) || hpg !== '' || apg !== '';
+      return `
+        <div class="lc-playoff-row" data-playoff-row data-match-id="${m.id}">
+          <div class="uk-grid-small uk-flex-middle" uk-grid>
+            <div class="uk-width-1-1 uk-width-1-5@m">
+              <div class="lc-playoff-name">${escapeHtml(playoffName(m.code))}</div>
+              <div class="uk-text-meta">${escapeHtml(m.code || '')}</div>
+            </div>
+            <div class="uk-width-1-1 uk-width-expand@m">
+              <div class="lc-playoff-teams">${escapeHtml(playoffTeamText(m, 'home'))} — ${escapeHtml(playoffTeamText(m, 'away'))}</div>
+            </div>
+            <div class="uk-width-1-1 uk-width-auto@m">
+              <div class="lc-playoff-score">
+                <input class="uk-input lc-po-home" type="number" min="0" max="99" placeholder="голы" value="${escapeHtml(hg)}">
+                <span>:</span>
+                <input class="uk-input lc-po-away" type="number" min="0" max="99" placeholder="голы" value="${escapeHtml(ag)}">
+                <button class="uk-button uk-button-primary uk-button-small" type="button" data-action="save-playoff">Сохранить</button>
+                <button class="uk-button uk-button-default uk-button-small" type="button" data-action="clear-playoff">Очистить</button>
+              </div>
+              <div class="lc-playoff-penalty uk-margin-small-top ${penVisible ? 'is-visible' : ''}">
+                <span class="uk-text-meta">Пенальти</span>
+                <input class="uk-input lc-po-home-pen" type="number" min="0" max="99" placeholder="пен." value="${escapeHtml(hpg)}">
+                <span>:</span>
+                <input class="uk-input lc-po-away-pen" type="number" min="0" max="99" placeholder="пен." value="${escapeHtml(apg)}">
+              </div>
+            </div>
+          </div>
+        </div>
+      `;
+    }).join('');
+
+    return `
+      <div class="uk-card uk-card-default uk-card-body uk-margin-top">
+        <div class="uk-h4 uk-margin-small-bottom">Плей-офф</div>
+        <div class="uk-text-meta uk-margin-small-bottom">Отдельный блок для ввода результатов стыковых матчей.</div>
+        ${rows}
+      </div>
+    `;
+  }
+
+  function bindPlayoffActions() {
+    el('boardsArea').querySelectorAll('[data-playoff-row]').forEach((row) => {
+      const home = row.querySelector('.lc-po-home');
+      const away = row.querySelector('.lc-po-away');
+      const homePen = row.querySelector('.lc-po-home-pen');
+      const awayPen = row.querySelector('.lc-po-away-pen');
+      const penWrap = row.querySelector('.lc-playoff-penalty');
+
+      const syncPenalty = () => {
+        const a = home.value.trim();
+        const b = away.value.trim();
+        const penFilled = homePen.value.trim() !== '' || awayPen.value.trim() !== '';
+        const show = (a !== '' && b !== '' && a === b) || penFilled;
+        penWrap.classList.toggle('is-visible', show);
+        if (!show) {
+          homePen.value = '';
+          awayPen.value = '';
+        }
+      };
+
+      home.addEventListener('input', syncPenalty);
+      away.addEventListener('input', syncPenalty);
+      homePen.addEventListener('input', syncPenalty);
+      awayPen.addEventListener('input', syncPenalty);
+
+      row.querySelector('[data-action="save-playoff"]').addEventListener('click', () => savePlayoffRow(row));
+      row.querySelector('[data-action="clear-playoff"]').addEventListener('click', () => clearPlayoffRow(row));
+    });
+  }
+
+  async function savePlayoffRow(row) {
+    const matchId = parseInt(row.dataset.matchId, 10);
+    const hg = row.querySelector('.lc-po-home').value.trim();
+    const ag = row.querySelector('.lc-po-away').value.trim();
+    const hpg = row.querySelector('.lc-po-home-pen').value.trim();
+    const apg = row.querySelector('.lc-po-away-pen').value.trim();
+
+    if (hg === '' && ag === '') {
+      await apiPost(API_SAVE, {match_id: matchId, home_goals: null, away_goals: null});
+      notify('Результат плей-офф очищен', 'warning');
+      await renderBoards();
+      return;
+    }
+
+    const homeGoals = parseInt(hg, 10);
+    const awayGoals = parseInt(ag, 10);
+    if (!Number.isInteger(homeGoals) || !Number.isInteger(awayGoals) || homeGoals < 0 || awayGoals < 0) {
+      notify('Голы должны быть числами >= 0', 'danger');
+      return;
+    }
+
+    const payload = { match_id: matchId, home_goals: homeGoals, away_goals: awayGoals };
+    if (homeGoals === awayGoals) {
+      payload.home_pen_goals = (hpg === '') ? null : parseInt(hpg, 10);
+      payload.away_pen_goals = (apg === '') ? null : parseInt(apg, 10);
+    }
+
+    await apiPost(API_SAVE, payload);
+    notify('Плей-офф сохранён', 'success');
+    await renderBoards();
+  }
+
+  async function clearPlayoffRow(row) {
+    const matchId = parseInt(row.dataset.matchId, 10);
+    await apiPost(API_SAVE, {match_id: matchId, home_goals: null, away_goals: null});
+    notify('Результат плей-офф очищен', 'warning');
+    await renderBoards();
+  }
+
+
+  function teamLabelHtml(t) {
+    const cityHtml = t.city ? (` <span class="team-city">${escapeHtml(formatCity(t.city))}</span>`) : '';
+    const logoHtml = t.logo_url ? `<img class="lc-team-logo" src="${escapeHtml(t.logo_url)}" alt="">` : '';
+    return `<span class="lc-team-inline">${logoHtml}<span>${escapeHtml(t.name)}</span></span>${cityHtml}`;
+  }
+
+  function formatCity(city) {
+    const s0 = String(city || '').trim();
+    if (!s0) return '';
+
+    const s = s0.replace(/\s+/g, ' ').toLowerCase();
+    const small = new Set(['и','в','во','на','к','ко','о','об','от','до','из','за','по','под','над','при','у','с','со','без','для','про']);
+
+    const words = s.split(' ');
+    const out = words.map((w, wi) => {
+      const parts = w.split('-').filter(Boolean);
+      const outParts = parts.map((p, pi) => {
+        if (!p) return p;
+        if ((wi !== 0 || pi !== 0) && small.has(p)) return p;
+        return p.charAt(0).toUpperCase() + p.slice(1);
+      });
+      return outParts.join('-');
+    });
+
+    return out.join(' ');
+  }
+
+  function escapeHtml(s) {
+    return String(s ?? '')
+      .replaceAll('&','&amp;')
+      .replaceAll('<','&lt;')
+      .replaceAll('>','&gt;')
+      .replaceAll('"','&quot;')
+      .replaceAll("'",'&#039;');
+  }
+
+  function openModal(btn) {
+    el('mMatchId').value = btn.dataset.match;
+    el('mRowId').value = btn.dataset.row;
+    el('mColId').value = btn.dataset.col;
+    el('mHomeId').value = btn.dataset.home;
+    el('mAwayId').value = btn.dataset.away;
+
+    const rowName = btn.dataset.rowname || 'Команда 1';
+    const colName = btn.dataset.colname || 'Команда 2';
+
+    el('mTitle').textContent = `${rowName} — ${colName}`;
+    el('mLeftName').textContent = rowName;
+    el('mRightName').textContent = colName;
+
+    const raw = btn.textContent.trim();
+    if (raw && raw.includes(':')) {
+      const [a,b] = raw.split(':');
+      el('mLeftGoals').value = a.trim();
+      el('mRightGoals').value = b.trim();
+    } else {
+      el('mLeftGoals').value = '';
+      el('mRightGoals').value = '';
+    }
+
+    UIkit.modal('#modalScore').show();
+  }
+
+  async function saveModal(clear=false) {
+    const matchId = parseInt(el('mMatchId').value, 10);
+    const rowId   = parseInt(el('mRowId').value, 10);
+    const colId   = parseInt(el('mColId').value, 10);
+    const homeId  = parseInt(el('mHomeId').value, 10);
+    const awayId  = parseInt(el('mAwayId').value, 10);
+
+    let left = el('mLeftGoals').value.trim();
+    let right = el('mRightGoals').value.trim();
+
+    if (clear) { left = ''; right = ''; }
+
+    if (left === '' && right === '') {
+      await apiPost(API_SAVE, {match_id: matchId, home_goals: null, away_goals: null});
+      notify('Результат очищен', 'warning');
+      UIkit.modal('#modalScore').hide();
+      await renderBoards();
+      return;
+    }
+
+    const lg = parseInt(left,10);
+    const rg = parseInt(right,10);
+    if (!Number.isInteger(lg) || !Number.isInteger(rg) || lg<0 || rg<0) {
+      notify('Голы должны быть числами >= 0', 'danger');
+      return;
+    }
+
+    let homeGoals, awayGoals;
+    if (rowId === homeId && colId === awayId) {
+      homeGoals = lg; awayGoals = rg;
+    } else if (rowId === awayId && colId === homeId) {
+      homeGoals = rg; awayGoals = lg;
+    } else {
+      notify('Странная пара команд для матча (проверь matches)', 'danger');
+      return;
+    }
+
+    await apiPost(API_SAVE, {match_id: matchId, home_goals: homeGoals, away_goals: awayGoals});
+    notify('Сохранено', 'success');
+    UIkit.modal('#modalScore').hide();
+    await renderBoards();
+  }
+
+  function openManualModal(groupCode) {
+    groupCode = String(groupCode || '').trim();
+    const st = GROUP_STATE[groupCode];
+    if (!st) {
+      notify('Группа не найдена', 'danger');
+      return;
+    }
+
+    el('mmTitle').textContent = `Ручная расстановка — Группа ${groupCode}`;
+    el('mmGroup').value = groupCode;
+
+    const ul = el('mmList');
+    ul.innerHTML = st.teams.map((t) => {
+      return `
+        <li class="lc-sort-item" data-id="${t.id}">
+          <span class="lc-handle uk-margin-small-right" uk-icon="icon: menu"></span>
+          <span class="lc-sort-text">${teamLabelHtml(t)}</span>
+        </li>
+      `;
+    }).join('');
+
+    UIkit.update(ul);
+
+    // ✅ НОВОЕ: "Сбросить" в модалке показываем только если ручная уже включена
+    if (el('mmClear')) el('mmClear').style.display = st.usedManual ? '' : 'none';
+
+    UIkit.modal('#modalManual').show();
+  }
+
+  async function saveManualOrder(clear=false) {
+    const group = el('mmGroup').value;
+    if (!group) return;
+
+    const ul = el('mmList');
+    const ids = Array.from(ul.querySelectorAll('li'))
+      .map(li => parseInt(li.dataset.id, 10))
+      .filter(Boolean);
+
+    const payload = {
+      stage_id: CURRENT.stage.id,
+      category: ACTIVE_CAT,
+      variant: ACTIVE_VARIANT,
+      group_code: group
+    };
+
+    if (clear) {
+      payload.clear = 1;
+    } else {
+      payload.order = ids;
+    }
+
+    await apiPost(API_PLACES, payload);
+    notify(clear ? 'Ручная расстановка сброшена' : 'Ручная расстановка сохранена', clear ? 'warning' : 'success');
+    UIkit.modal('#modalManual').hide();
+    await renderBoards();
+  }
+
+  // ✅ НОВОЕ: сброс ручной расстановки только если она включена
+  async function clearManual(groupCode) {
+    groupCode = String(groupCode || '').trim();
+    const st = GROUP_STATE[groupCode];
+
+    if (!st || !st.usedManual) {
+      notify('Ручная расстановка не включена', 'warning');
+      return;
+    }
+
+    if (!confirm(`Сбросить ручную расстановку для группы ${groupCode}?`)) return;
+
+    await apiPost(API_PLACES, {
+      stage_id: CURRENT.stage.id,
+      category: ACTIVE_CAT,
+      variant: ACTIVE_VARIANT,
+      group_code: groupCode,
+      clear: 1
+    });
+
+    notify('Ручная расстановка сброшена', 'warning');
+    await renderBoards();
+  }
+
+  async function init() {
+    try {
+      const cj = await apiGet(API_CURRENT);
+      CURRENT = cj;
+
+      const st = (cj && cj.stage) ? cj.stage : {};
+      const from = st.date_from || st.start_date || st.start || st.from || '';
+      const to   = st.date_to   || st.end_date   || st.end   || st.to   || '';
+      const range = (from && to) ? ` (${from} — ${to})` : '';
+      const stageName = st.name ? String(st.name) : (st.id ? ('Этап #' + st.id) : '');
+      el('stageLine').textContent = stageName ? (`Текущий этап: ${stageName}${range}`) : '';
+
+      const cats = await apiGet(`${API_PUBLIC}?type=stage_categories&stage_id=${cj.stage.id}`);
+      CATS = cats.items || [];
+      buildTabs();
+      await loadVariantsAndRender();
+
+      el('btnSave').addEventListener('click', () => saveModal(false));
+      el('btnClear').addEventListener('click', () => saveModal(true));
+      el('mmSave').addEventListener('click', () => saveManualOrder(false));
+      el('mmClear').addEventListener('click', () => saveManualOrder(true));
+    } catch (e) {
+      notify(e.message || 'Ошибка', 'danger');
+      console.error(e);
+    }
+  }
+
+  init();
+})();
+
+</script>
+
+</body>
+</html>

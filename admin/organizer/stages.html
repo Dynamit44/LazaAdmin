@@ -1,0 +1,572 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>LazaCup — Этапы</title>
+
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/uikit@3/dist/css/uikit.min.css">
+  <link rel="stylesheet" href="/admin/_admin.css?v=4">
+
+  <script src="https://cdn.jsdelivr.net/npm/uikit@3/dist/js/uikit.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/uikit@3/dist/js/uikit-icons.min.js"></script>
+
+   <script src="/admin/_admin.js?v=4" defer></script>
+   <script>
+     document.addEventListener('DOMContentLoaded', () => {
+       Admin.initAdminHeader('organizer');
+     });
+   </script>
+
+</head>
+<body>
+
+<!-- ADMIN HEADER (organizer) -->
+<header class="lc-admin-header uk-background-default uk-box-shadow-small" uk-sticky="show-on-up: true; animation: uk-animation-slide-top">
+  <div class="uk-container uk-container-large">
+    <nav class="uk-navbar-container uk-navbar-transparent" uk-navbar>
+      <div class="uk-navbar-left">
+        <a class="uk-navbar-item uk-logo lc-admin-logo" href="/admin/">
+          <span class="lc-badge">LC</span>
+          <span class="uk-margin-small-left">LazaCup <span class="uk-text-muted">Admin</span></span>
+        </a>
+
+        <ul class="uk-navbar-nav uk-visible@m" id="adminNav">
+          <li><a href="/admin/organizer/tournaments.html">Турниры</a></li>
+          <li><a class="uk-disabled" href="/admin/organizer/stages.html">Этапы</a></li>
+          <li><a href="/admin/organizer/stage-categories.html">Категории</a></li>
+          <li><a href="/admin/organizer/field-rules.html">Поля</a></li>
+          <li><a href="/admin/organizer/squads-import.html">Команды</a></li>
+          <li><a href="/admin/organizer/groups.html">Группы</a></li>
+          <li><a href="/admin/organizer/playoff.html">Плей-офф</a></li>
+          <li><a href="/admin/organizer/schedule.html">Расписание</a></li>
+        </ul>
+      </div>
+
+      <div class="uk-navbar-right">
+        <div class="uk-navbar-item uk-visible@m">
+          <span class="uk-text-small uk-text-muted">Вы:</span>
+          <span id="adminUser" class="uk-text-small uk-margin-small-left">—</span>
+        </div>
+
+        <div class="uk-navbar-item">
+          <button id="btnLogout" class="uk-button uk-button-default" type="button">
+            <span uk-icon="sign-out"></span> Выйти
+          </button>
+        </div>
+
+        <a class="uk-navbar-toggle uk-hidden@m" uk-toggle="target: #adminOffcanvas" href="#">
+          <span uk-navbar-toggle-icon></span>
+        </a>
+      </div>
+    </nav>
+  </div>
+</header>
+
+<div id="adminOffcanvas" uk-offcanvas="overlay: true">
+  <div class="uk-offcanvas-bar">
+    <button class="uk-offcanvas-close" type="button" uk-close></button>
+
+    <div class="uk-margin">
+      <div class="uk-text-small uk-text-muted">Вы:</div>
+      <div id="adminUserMobile">—</div>
+    </div>
+
+    <ul class="uk-nav uk-nav-default" id="adminNavMobile">
+      <li><a href="/admin/organizer/tournaments.html">Турниры</a></li>
+      <li><a class="uk-disabled" href="/admin/organizer/stages.html">Этапы</a></li>
+      <li><a href="/admin/organizer/stage-categories.html">Категории</a></li>
+      <li><a href="/admin/organizer/field-rules.html">Поля</a></li>
+      <li><a href="/admin/organizer/squads-import.html">Команды</a></li>
+      <li><a href="/admin/organizer/groups.html">Группы</a></li>
+      <li><a href="/admin/organizer/playoff.html">Плей-офф</a></li>
+      <li><a href="/admin/organizer/schedule.html">Расписание</a></li>
+      <li class="uk-nav-divider"></li>
+      <li><a href="#" id="btnLogoutMobile">Выйти</a></li>
+    </ul>
+  </div>
+</div>
+<!-- /ADMIN HEADER (organizer) -->
+
+<div class="uk-container uk-container-large uk-margin-large-top">
+
+  <div class="uk-card uk-card-default uk-card-body uk-margin">
+    <h4 class="uk-margin-remove-top">Добавить / редактировать этап</h4>
+
+    <input type="hidden" id="id">
+
+    <div class="uk-grid-small" uk-grid>
+      <div class="uk-width-1-4@m">
+         <div class="uk-grid-small" uk-grid>
+           <div class="uk-width-expand">
+             <label class="uk-form-label">Турнир</label>
+             <select id="tournamentSelect" class="uk-select"></select>
+           </div>
+           <!-- <div class="uk-width-auto uk-flex uk-flex-bottom">
+             <button id="btnNewTournament" class="uk-button uk-button-default" type="button">+ Турнир</button>
+           </div> -->
+         </div>
+      </div>
+
+      <div class="uk-width-expand@m">
+        <label class="uk-form-label">Название</label>
+        <input id="name" class="uk-input" placeholder="Stage 1">
+      </div>
+    </div>
+
+    <div class="uk-grid-small uk-margin-small-top" uk-grid>
+      <div class="uk-width-1-4@m">
+        <label class="uk-form-label">Start date</label>
+        <input id="start_date" class="uk-input" type="date">
+      </div>
+      <div class="uk-width-1-4@m">
+        <label class="uk-form-label">End date</label>
+        <input id="end_date" class="uk-input" type="date">
+      </div>
+      <div class="uk-width-1-4@m">
+        <label class="uk-form-label">Day start</label>
+        <input id="day_start" class="uk-input mono" value="10:00:00">
+      </div>
+      <div class="uk-width-1-4@m">
+        <label class="uk-form-label">Day end</label>
+        <input id="day_end" class="uk-input mono" value="18:00:00">
+      </div>
+    </div>
+
+    <div class="uk-grid-small uk-margin-small-top uk-child-width-1-5@m" uk-grid>
+      <div class="stages-time">
+        <label class="uk-form-label">Поля (1–4)</label>
+        <input id="fields" class="uk-input" type="number" min="1" max="4" value="4">
+        <div class="uk-text-small uk-text-muted">Рекомендуется 4 (поле делится на 4 части).</div>
+      </div>
+      <div class="stages-time">
+        <label class="uk-form-label">Тайм (мин)</label>
+        <input id="match_minutes" class="uk-input" type="number" min="5" value="20">
+      </div>
+      <div class="stages-time">
+        <label class="uk-form-label">Перерыв (мин)</label>
+        <input id="break_minutes" class="uk-input" type="number" min="0" value="5">
+      </div>
+      <div class="stages-time">
+        <label class="uk-form-label">Пауза между матчами (мин)</label>
+        <div class="uk-form-controls">
+          <input class="uk-input" type="number" id="transition_minutes" min="0" value="15">
+        </div>
+      </div>
+      <div class="stages-time">
+        <label class="uk-form-label">Min rest slots</label>
+        <input id="min_rest_slots" class="uk-input" type="number" min="0" value="0">
+      </div>
+    </div>
+
+    <div class="uk-grid-small uk-margin-small-top" uk-grid>
+      <div class="uk-width-1-2@m">
+        <label class="uk-form-label">Timezone</label>
+        <input id="timezone" class="uk-input" value="Europe/Moscow">
+      </div>
+
+      <div class="uk-width-1-2@m uk-flex uk-flex-bottom uk-flex-right uk-grid-small" uk-grid>
+        <button id="btnReset" class="uk-button uk-button-default" type="button">Очистить</button>
+        <button id="btnSave" class="uk-button uk-button-primary" type="button">Сохранить этап</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="uk-card uk-card-default uk-card-body">
+    <div class="uk-flex uk-flex-between uk-flex-middle uk-margin-small">
+      <h4 class="uk-margin-remove">Список этапов</h4>
+      <button id="btnReload" class="uk-button uk-button-default" type="button">Обновить</button>
+    </div>
+
+    <div class="uk-overflow-auto">
+      <table class="uk-table uk-table-small uk-table-divider uk-table-hover">
+<thead>
+  <tr>
+    <th style="width:70px">ID</th>
+    <th>Название</th>
+    <th style="width:220px">Даты</th>
+    <th style="width:180px">Время</th>
+    <th style="width:80px">Поля</th>
+    <th style="width:140px">Тайм/перерыв</th>
+    <th style="width:110px">Rest slots</th>
+    <th style="width:160px">TZ</th>
+    <th style="width:110px" class="uk-text-center">Текущий</th>
+    <th class="uk-text-right" style="width:220px">Действия</th>
+  </tr>
+</thead>
+        <tbody id="tbody"></tbody>
+      </table>
+    </div>
+  </div>
+
+</div>
+
+<script>
+(function(){
+  const API_TOURNAMENTS   = '/api/tournament/tournaments.php';
+  const API_STAGES        = '/api/tournament/stages.php';
+  const API_SAVE          = '/api/tournament/stage_save.php';
+  const API_DEL           = '/api/tournament/stage_delete.php';
+  const API_SET_CURRENT   = '/api/tournament/stage_set_current.php';
+
+  const el = (id) => document.getElementById(id);
+
+  // поддержим оба варианта id, чтобы не гадать, что у тебя сейчас в верстке
+  const tournamentSelect = el('tournamentSelect') || el('tournament_id');
+  const tbody            = el('tbody') || document.querySelector('tbody#tbody') || document.querySelector('tbody');
+  const formTitleEl      = el('formTitle');
+  const formStateEl      = el('formState');
+
+  const setText = (node, txt) => { if (node) node.textContent = (txt ?? ''); };
+
+  const state = {
+    busy: false,
+    tournaments: [],
+    stages: [],
+    stageById: new Map()
+  };
+
+  function notify(msg, status='primary') {
+    UIkit.notification({message: msg, status, pos:'top-right', timeout: 2500});
+  }
+
+  function redirectLoginIf401(res) {
+    if (res.status === 401) {
+      location.href = '/admin/login.html?next=' + encodeURIComponent(location.pathname);
+      return true;
+    }
+    return false;
+  }
+
+  async function safeJson(res) {
+    const txt = await res.text();
+    let j = null;
+    try { j = JSON.parse(txt); } catch(e) {}
+
+    if (redirectLoginIf401(res)) return null;
+
+    if (!res.ok) {
+      throw new Error(`HTTP ${res.status}: ` + (j?.error || txt.slice(0, 400) || 'empty response'));
+    }
+    if (!j || !j.ok) {
+      throw new Error(j?.error || txt.slice(0, 400) || 'bad json/empty response');
+    }
+    return j;
+  }
+
+  function getVal(id) {
+    const n = el(id);
+    return n ? String(n.value ?? '').trim() : '';
+  }
+  function setVal(id, v) {
+    const n = el(id);
+    if (n) n.value = (v ?? '');
+  }
+
+  async function loadTournaments() {
+    if (!tournamentSelect) throw new Error('Не найден select турниров (id=tournamentSelect или id=tournament_id)');
+
+    const res = await fetch(API_TOURNAMENTS, {credentials:'same-origin'});
+    const j = await safeJson(res);
+    if (!j) return;
+
+    const items = j.tournaments || j.items || [];
+    state.tournaments = items;
+
+    const prev = String(tournamentSelect.value || '');
+    tournamentSelect.innerHTML = '';
+
+    items.forEach(t => {
+      const opt = document.createElement('option');
+      opt.value = String(t.id);
+      const star = (Number(t.is_current || 0) === 1) ? ' ★' : '';
+      opt.textContent = `#${t.id} — ${t.name}${star}`;
+      tournamentSelect.appendChild(opt);
+    });
+
+    if (!tournamentSelect.options.length) {
+      notify('Турниры не найдены. Создай турнир в разделе “Турниры”.', 'warning');
+      return;
+    }
+
+    // 1) если был выбран — оставим
+    if (prev && items.some(t => String(t.id) === prev)) {
+      tournamentSelect.value = prev;
+      return;
+    }
+
+    // 2) иначе выберем текущий
+    const cur = items.find(t => Number(t.is_current || 0) === 1);
+    if (cur) {
+      tournamentSelect.value = String(cur.id);
+      return;
+    }
+
+    // 3) иначе первый
+    tournamentSelect.value = tournamentSelect.options[0].value;
+  }
+
+  async function loadStages() {
+    if (!tbody) throw new Error('Не найден tbody таблицы этапов (id=tbody)');
+
+    const tid = Number(tournamentSelect?.value || 0);
+    if (!tid) {
+      tbody.innerHTML = '';
+      return;
+    }
+
+    const res = await fetch(`${API_STAGES}?tournament_id=${encodeURIComponent(tid)}`, {credentials:'same-origin'});
+    const j = await safeJson(res);
+    if (!j) return;
+
+    const items = j.stages || j.items || [];
+    state.stages = items;
+    state.stageById.clear();
+    items.forEach(s => state.stageById.set(Number(s.id), s));
+
+    renderStages();
+  }
+
+  function renderStages() {
+    tbody.innerHTML = '';
+
+    if (!state.stages.length) {
+      const tr = document.createElement('tr');
+      tr.innerHTML = `<td colspan="10" class="uk-text-muted">Пока нет этапов.</td>`;
+      tbody.appendChild(tr);
+      return;
+    }
+
+    state.stages.forEach(s => {
+      const id = Number(s.id || 0);
+      const isCur = (Number(s.is_current || 0) === 1);
+
+      const tr = document.createElement('tr');
+      tr.dataset.id = String(id);
+
+      tr.innerHTML = `
+        <td class="mono"></td>
+        <td class="cellName"></td>
+        <td class="mono"></td>
+        <td class="mono"></td>
+        <td></td>
+        <td></td>
+        <td></td>
+        <td class="mono"></td>
+        <td class="uk-text-center">
+          <input class="uk-radio js-current" type="radio" name="currentStage" value="${id}" ${isCur ? 'checked' : ''}>
+        </td>
+        <td class="uk-text-right">
+          <div class="uk-button-group">
+            <button class="uk-button uk-button-small uk-button-default btnEdit" type="button" data-id="${id}">Изм.</button>
+            <button class="uk-button uk-button-small uk-button-danger btnDel" type="button" data-id="${id}">Удал.</button>
+          </div>
+        </td>
+      `;
+
+      tr.children[0].textContent = String(id);
+      tr.querySelector('.cellName').textContent = String(s.name || '');
+      tr.children[2].textContent = `${s.start_date || ''} — ${s.end_date || ''}`;
+      tr.children[3].textContent = `${s.day_start || ''} — ${s.day_end || ''}`;
+      tr.children[4].textContent = String(s.fields ?? '');
+      tr.children[5].textContent = `${s.match_minutes ?? ''} / ${s.break_minutes ?? ''} + ${s.transition_minutes ?? ''}`;
+      tr.children[6].textContent = String(s.min_rest_slots ?? '');
+      tr.children[7].textContent = String(s.timezone ?? '');
+
+      tbody.appendChild(tr);
+    });
+  }
+
+  function resetForm() {
+    setVal('id', '');
+    setVal('name', '');
+    setVal('start_date', '');
+    setVal('end_date', '');
+    setVal('day_start', '09:00:00');
+    setVal('day_end', '18:00:00');
+    setVal('fields', '4');
+    setVal('match_minutes', '20');
+    setVal('break_minutes', '5');
+    setVal('transition_minutes', '15');
+    setVal('min_rest_slots', '0');
+    setVal('timezone', 'Europe/Moscow');
+
+    setText(formTitleEl, 'Добавить этап');
+    setText(formStateEl, '');
+  }
+
+  function fillForm(s) {
+    setVal('id', s.id || '');
+    setVal('name', s.name || '');
+    setVal('start_date', s.start_date || '');
+    setVal('end_date', s.end_date || '');
+    setVal('day_start', s.day_start || '');
+    setVal('day_end', s.day_end || '');
+    setVal('fields', String(s.fields ?? 4));
+    setVal('match_minutes', String(s.match_minutes ?? 20));
+    setVal('break_minutes', String(s.break_minutes ?? 5));
+    setVal('transition_minutes', String(s.transition_minutes ?? 15));
+    setVal('min_rest_slots', String(s.min_rest_slots ?? 0));
+    setVal('timezone', s.timezone || 'Europe/Moscow');
+
+    setText(formTitleEl, 'Редактировать этап');
+    setText(formStateEl, 'ID: ' + (s.id || ''));
+
+    window.scrollTo({top:0, behavior:'smooth'});
+    el('name')?.focus();
+  }
+
+  async function saveStage() {
+    if (state.busy) return;
+    state.busy = true;
+
+    const btn = el('btnSave');
+    if (btn) btn.disabled = true;
+
+    try {
+      const tournament_id = Number(tournamentSelect?.value || 0);
+      if (!tournament_id) { notify('Выбери турнир', 'warning'); return; }
+
+      const payload = {
+        id: getVal('id') ? Number(getVal('id')) : 0,
+        tournament_id,
+        name: getVal('name'),
+        start_date: getVal('start_date'),
+        end_date: getVal('end_date'),
+        day_start: getVal('day_start'),
+        day_end: getVal('day_end'),
+        fields: Number(getVal('fields') || 4),
+        match_minutes: Number(getVal('match_minutes') || 20),
+        break_minutes: Number(getVal('break_minutes') || 5),
+        transition_minutes: parseInt(el('transition_minutes').value || '15', 10),
+        min_rest_slots: Number(getVal('min_rest_slots') || 0),
+        timezone: getVal('timezone') || 'Europe/Moscow'
+      };
+
+      if (!payload.name) { notify('Укажи название этапа', 'warning'); return; }
+
+      const res = await fetch(API_SAVE, {
+        method:'POST',
+        credentials:'same-origin',
+        headers:{'Content-Type':'application/json'},
+        body: JSON.stringify(payload)
+      });
+
+      const j = await safeJson(res);
+      if (!j) return;
+
+      notify(payload.id ? 'Этап обновлён' : 'Этап создан', 'success');
+      resetForm();
+      await loadStages();
+
+    } catch(e) {
+      notify(e.message || 'Ошибка сохранения', 'danger');
+    } finally {
+      if (btn) btn.disabled = false;
+      state.busy = false;
+    }
+  }
+
+  async function delStage(id) {
+    id = Number(id || 0);
+    if (!id || state.busy) return;
+
+    if (!confirm('Удалить этап #' + id + '?\nЕсли есть данные внутри этапа — БД может запретить.')) return;
+
+    state.busy = true;
+
+    try {
+      const res = await fetch(API_DEL, {
+        method:'POST',
+        credentials:'same-origin',
+        headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({id})
+      });
+
+      const j = await safeJson(res);
+      if (!j) return;
+
+      notify('Этап удалён', 'success');
+      await loadStages();
+
+    } catch(e) {
+      notify(e.message || 'Ошибка удаления', 'danger');
+    } finally {
+      state.busy = false;
+    }
+  }
+
+  async function setCurrentStage(id) {
+    id = Number(id || 0);
+    if (!id) return;
+
+    try {
+      const res = await fetch(API_SET_CURRENT, {
+        method:'POST',
+        credentials:'same-origin',
+        headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({id})
+      });
+
+      await safeJson(res);
+      notify('Текущий этап выбран', 'success');
+      await loadStages();
+
+    } catch(e) {
+      notify(e.message || 'Ошибка установки текущего этапа', 'danger');
+      await loadStages().catch(()=>{});
+    }
+  }
+
+  // events
+  tbody?.addEventListener('click', (e) => {
+    const editBtn = e.target.closest('button.btnEdit');
+    if (editBtn) {
+      const id = Number(editBtn.dataset.id || 0);
+      const s = state.stageById.get(id);
+      if (!s) { notify('Не нашёл этап #' + id, 'danger'); return; }
+      fillForm(s);
+      return;
+    }
+
+    const delBtn = e.target.closest('button.btnDel');
+    if (delBtn) {
+      const id = Number(delBtn.dataset.id || 0);
+      delStage(id);
+      return;
+    }
+  });
+
+  tbody?.addEventListener('change', (e) => {
+    const r = e.target.closest('input.js-current');
+    if (r && r.checked) setCurrentStage(Number(r.value || 0));
+  });
+
+  el('btnReload')?.addEventListener('click', () => loadStages().catch(e => notify(e.message,'danger')));
+  el('btnSave')?.addEventListener('click', saveStage);
+  el('btnReset')?.addEventListener('click', resetForm);
+
+  tournamentSelect?.addEventListener('change', async () => {
+    try {
+      resetForm();
+      await loadStages();
+    } catch(e) {
+      notify(e.message || 'Ошибка загрузки этапов', 'danger');
+    }
+  });
+
+  (async function init(){
+    try {
+      await loadTournaments();
+      resetForm();
+      await loadStages();
+    } catch(e) {
+      notify(e.message || 'Ошибка инициализации', 'danger');
+    }
+  })();
+})();
+</script>
+
+
+</body>
+</html>

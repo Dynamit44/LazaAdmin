@@ -1,0 +1,336 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>LazaCup — Поля этапа (константы)</title>
+
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/uikit@3/dist/css/uikit.min.css">
+  <link rel="stylesheet" href="/admin/_admin.css?v=4">
+
+  <script src="https://cdn.jsdelivr.net/npm/uikit@3/dist/js/uikit.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/uikit@3/dist/js/uikit-icons.min.js"></script>
+
+   <script src="/admin/_admin.js?v=4" defer></script>
+   <script>
+     document.addEventListener('DOMContentLoaded', () => {
+       Admin.initAdminHeader('organizer');
+     });
+   </script>
+
+</head>
+<body>
+
+<!-- ADMIN HEADER (organizer) -->
+<header class="lc-admin-header uk-background-default uk-box-shadow-small" uk-sticky="show-on-up: true; animation: uk-animation-slide-top">
+  <div class="uk-container uk-container-large">
+    <nav class="uk-navbar-container uk-navbar-transparent" uk-navbar>
+      <div class="uk-navbar-left">
+        <a class="uk-navbar-item uk-logo lc-admin-logo" href="/admin/">
+          <span class="lc-badge">LC</span>
+          <span class="uk-margin-small-left">LazaCup <span class="uk-text-muted">Admin</span></span>
+        </a>
+
+        <ul class="uk-navbar-nav uk-visible@m" id="adminNav">
+          <li><a href="/admin/organizer/tournaments.html">Турниры</a></li>
+          <li><a href="/admin/organizer/stages.html">Этапы</a></li>
+          <li><a href="/admin/organizer/stage-categories.html">Категории</a></li>
+          <li><a class="uk-disabled" href="/admin/organizer/field-rules.html">Поля</a></li>
+          <li><a href="/admin/organizer/squads-import.html">Команды</a></li>
+          <li><a href="/admin/organizer/groups.html">Группы</a></li>
+          <li><a href="/admin/organizer/playoff.html">Плей-офф</a></li>
+          <li><a href="/admin/organizer/schedule.html">Расписание</a></li>
+        </ul>
+      </div>
+
+      <div class="uk-navbar-right">
+        <div class="uk-navbar-item uk-visible@m">
+          <span class="uk-text-small uk-text-muted">Вы:</span>
+          <span id="adminUser" class="uk-text-small uk-margin-small-left">—</span>
+        </div>
+
+        <div class="uk-navbar-item">
+          <button id="btnLogout" class="uk-button uk-button-default" type="button">
+            <span uk-icon="sign-out"></span> Выйти
+          </button>
+        </div>
+
+        <a class="uk-navbar-toggle uk-hidden@m" uk-toggle="target: #adminOffcanvas" href="#">
+          <span uk-navbar-toggle-icon></span>
+        </a>
+      </div>
+    </nav>
+  </div>
+</header>
+
+<div id="adminOffcanvas" uk-offcanvas="overlay: true">
+  <div class="uk-offcanvas-bar">
+    <button class="uk-offcanvas-close" type="button" uk-close></button>
+
+    <div class="uk-margin">
+      <div class="uk-text-small uk-text-muted">Вы:</div>
+      <div id="adminUserMobile">—</div>
+    </div>
+
+    <ul class="uk-nav uk-nav-default" id="adminNavMobile">
+      <li><a href="/admin/organizer/tournaments.html">Турниры</a></li>
+      <li><a class="uk-disabled" href="/admin/organizer/stages.html">Этапы</a></li>
+      <li><a href="/admin/organizer/stage-categories.html">Категории</a></li>
+      <li><a class="uk-disabled" href="/admin/organizer/field-rules.html">Поля</a></li>
+      <li><a href="/admin/organizer/squads-import.html">Команды</a></li>
+      <li><a href="/admin/organizer/groups.html">Группы</a></li>
+      <li><a href="/admin/organizer/playoff.html">Плей-офф</a></li>
+      <li><a href="/admin/organizer/schedule.html">Расписание</a></li>
+      <li class="uk-nav-divider"></li>
+      <li><a href="#" id="btnLogoutMobile">Выйти</a></li>
+    </ul>
+  </div>
+</div>
+<!-- /ADMIN HEADER (organizer) -->
+
+<div class="uk-container uk-container-small uk-margin-large-top">
+
+  <div class="uk-flex uk-flex-between uk-flex-middle uk-margin">
+    <h2 class="uk-margin-remove">Поля этапа (константы)</h2>
+  </div>
+
+  <div class="uk-card uk-card-default uk-card-body uk-margin">
+    <div class="uk-grid-small" uk-grid>
+      <div class="uk-width-expand">
+        <label class="uk-form-label">Этап</label>
+        <select id="stageSelect" class="uk-select"></select>
+      </div>
+      <div class="uk-width-auto uk-flex uk-flex-bottom">
+        <button id="btnLoad" class="uk-button uk-button-default">Загрузить</button>
+      </div>
+    </div>
+
+    <div class="uk-alert-primary uk-margin" uk-alert>
+      <div>
+        Формат строк:
+        <span class="mono">категории: 2018,2017</span> и <span class="mono">поля: 1,3</span><br>
+        Поля допускаются: <span class="mono">1 2 3 4 12 34</span> или <span class="mono">full |полное поле|</span>
+      </div>
+    </div>
+
+    <table class="uk-table uk-table-small uk-table-divider">
+      <thead>
+        <tr>
+          <th style="width:45%">Категории (через запятую)</th>
+          <th style="width:45%">Поля (через запятую)</th>
+          <th style="width:10%"></th>
+        </tr>
+      </thead>
+      <tbody id="linesBody"></tbody>
+    </table>
+
+    <div class="uk-flex uk-flex-between uk-flex-middle">
+      <button id="btnAdd" class="uk-button uk-button-default" type="button">+ строка</button>
+      <button id="btnSave" class="uk-button uk-button-primary" type="button">Сохранить</button>
+    </div>
+  </div>
+
+  <div class="uk-card uk-card-default uk-card-body">
+    <h4 class="uk-margin-remove-top">Что получится (авто-variant при повторе категории)</h4>
+    <div id="preview" class="uk-margin-small-top"></div>
+  </div>
+
+</div>
+
+<script>
+
+(function(){
+  const apiStages = '/api/tournament/stages.php';
+  const apiRules  = '/api/tournament/field_rules.php';
+
+  const stageSelect = document.getElementById('stageSelect');
+  const linesBody   = document.getElementById('linesBody');
+  const previewBox  = document.getElementById('preview');
+
+  function notify(msg, status='primary') {
+    UIkit.notification({message: msg, status, pos: 'top-right', timeout: 2500});
+  }
+
+  function redirect401(res) {
+    if (res.status === 401) {
+      location.href = '/admin/login.html?next=' + encodeURIComponent(location.pathname);
+      return true;
+    }
+    return false;
+  }
+
+  async function safeJson(res) {
+    const txt = await res.text();
+    let j = null;
+    try { j = JSON.parse(txt); } catch(e) {}
+
+    if (!res.ok) {
+      throw new Error(`HTTP ${res.status}: ` + (j?.error || txt.slice(0, 400) || 'empty response'));
+    }
+    if (!j || !j.ok) {
+      throw new Error(j?.error || txt.slice(0, 400) || 'bad json/empty response');
+    }
+    return j;
+  }
+
+  function escapeHtml(s) {
+    return String(s).replace(/[&<>"']/g, m => ({
+      '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'
+    }[m]));
+  }
+
+  function makeRow(categories='', fields='') {
+    const tr = document.createElement('tr');
+
+    tr.innerHTML = `
+      <td><input class="uk-input" name="categories" placeholder="2018,2017" value="${escapeHtml(categories)}"></td>
+      <td><input class="uk-input" name="fields" placeholder="1,3 / 12,34 / полное поле" value="${escapeHtml(fields)}"></td>
+      <td class="uk-text-right">
+        <button class="uk-button uk-button-text uk-text-danger" type="button" title="Удалить">×</button>
+      </td>
+    `;
+
+    tr.querySelector('button').addEventListener('click', () => {
+      tr.remove();
+      renderPreview();
+    });
+
+    tr.querySelectorAll('input').forEach(inp => inp.addEventListener('input', renderPreview));
+
+    linesBody.appendChild(tr);
+  }
+
+  function getLines() {
+    const rows = [];
+    linesBody.querySelectorAll('tr').forEach(tr => {
+      const c = tr.querySelector('input[name="categories"]').value.trim();
+      const f = tr.querySelector('input[name="fields"]').value.trim();
+      if (c && f) rows.push({categories: c, fields: f});
+    });
+    return rows;
+  }
+
+  function renderPreview() {
+    const lines = getLines();
+
+    const cnt = {}; // category -> count
+    const out = []; // {category, variant, fields}
+    lines.forEach(line => {
+      const cats = line.categories.split(',').map(s=>s.trim()).filter(Boolean);
+      cats.forEach(cat => {
+        cnt[cat] = (cnt[cat] || 0) + 1;
+        out.push({category: cat, variant: cnt[cat], fields: line.fields});
+      });
+    });
+
+    if (!out.length) {
+      previewBox.innerHTML = '<div class="uk-text-muted">Пока пусто.</div>';
+      return;
+    }
+
+    const byCat = {};
+    out.forEach(r => ((byCat[r.category] ||= []).push(r)));
+
+    let html = '<div class="uk-overflow-auto"><table class="uk-table uk-table-small uk-table-striped">';
+    html += '<thead><tr><th>Категория</th><th>Вариант</th><th>Поля</th></tr></thead><tbody>';
+    Object.keys(byCat).sort().forEach(cat => {
+      byCat[cat].forEach(r => {
+        html += `<tr><td>${escapeHtml(cat)}</td><td>${r.variant}</td><td class="mono">${escapeHtml(r.fields)}</td></tr>`;
+      });
+    });
+    html += '</tbody></table></div>';
+
+    previewBox.innerHTML = html;
+  }
+
+  async function loadStages() {
+    const res = await fetch(apiStages, {credentials:'same-origin'});
+    if (redirect401(res)) return;
+
+    const j = await safeJson(res);
+
+    stageSelect.innerHTML = '';
+    (j.stages || []).forEach(s => {
+      const opt = document.createElement('option');
+      opt.value = s.id;
+
+      const title = (s.name && String(s.name).trim()) ? String(s.name).trim() : `Этап #${s.id}`;
+      const cats = s.categories_csv ? ` | ${s.categories_csv}` : '';
+      opt.textContent = `[#${s.tournament_id}] ${title} (${s.start_date} — ${s.end_date})${cats}`;
+
+      stageSelect.appendChild(opt);
+    });
+
+    if (stageSelect.options.length && !stageSelect.value) {
+      stageSelect.value = stageSelect.options[0].value;
+    }
+  }
+
+  async function loadRules(stageId) {
+    const res = await fetch(`${apiRules}?stage_id=${encodeURIComponent(stageId)}`, {credentials:'same-origin'});
+    if (redirect401(res)) return;
+
+    const j = await safeJson(res);
+
+    linesBody.innerHTML = '';
+    const lines = j.lines || [];
+    if (lines.length) {
+      lines.forEach(l => makeRow(l.categories, l.fields));
+    } else {
+      makeRow('', '');
+    }
+    renderPreview();
+  }
+
+  async function saveRules() {
+    const stageId = stageSelect.value;
+    const lines = getLines();
+
+    if (!stageId) { notify('Выбери этап', 'warning'); return; }
+    if (!lines.length) { notify('Добавь хотя бы одну строку', 'warning'); return; }
+
+    const res = await fetch(apiRules, {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({stage_id: Number(stageId), lines})
+    });
+    await safeJson(res);
+
+    notify('Сохранено', 'success');
+    await loadRules(stageId);
+  }
+
+  document.getElementById('btnAdd').addEventListener('click', () => { makeRow('', ''); renderPreview(); });
+
+  document.getElementById('btnLoad').addEventListener('click', async () => {
+    try { await loadRules(stageSelect.value); }
+    catch(e){ notify(e.message, 'danger'); }
+  });
+
+  document.getElementById('btnSave').addEventListener('click', async () => {
+    try { await saveRules(); }
+    catch(e){ notify(e.message, 'danger'); }
+  });
+
+  stageSelect.addEventListener('change', async () => {
+    try { await loadRules(stageSelect.value); }
+    catch(e){ notify(e.message, 'danger'); }
+  });
+
+  (async function init(){
+    try {
+      await loadStages();
+      await loadRules(stageSelect.value);
+      renderPreview();
+    } catch(e) {
+      notify(e.message, 'danger');
+      if (!linesBody.querySelector('tr')) makeRow('', '');
+      renderPreview();
+    }
+  })();
+})();
+</script>
+
+</body>
+</html>

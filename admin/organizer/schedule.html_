@@ -1,0 +1,3173 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Organizer — Расписание</title>
+
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/uikit@3/dist/css/uikit.min.css">
+  <link rel="stylesheet" href="/admin/_admin.css?v=4">
+
+  <script src="https://cdn.jsdelivr.net/npm/uikit@3/dist/js/uikit.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/uikit@3/dist/js/uikit-icons.min.js"></script>
+
+  <!--
+    Manual drag:
+    НЕ используем pointer-events:none на карточках — это ломает dragover/drop в некоторых браузерах
+    (не срабатывает e.preventDefault на корректном target => drop отменяется).
+    Вместо этого определяем drop-ячейку через elementsFromPoint().
+  -->
+
+
+  <style>
+/*     .match-draggable.is-dragging{ pointer-events:none; } */
+.lc-event-cell{background:rgba(79,168,233,.12);}
+.lc-event-cell .lc-stage-event{display:flex;flex-direction:column;gap:2px;align-items:center;justify-content:center;padding:6px 4px;line-height:1.15;}
+.lc-stage-event-title{font-weight:700;text-transform:uppercase;font-size:11px;letter-spacing:.02em;}
+.lc-stage-event-time{font-size:11px;opacity:.8;}
+.lc-stage-event--opening .lc-stage-event-title,.lc-stage-event--closing .lc-stage-event-title{color:#173F69;}
+.lc-stage-event--awarding .lc-stage-event-title{color:#8A6D1D;}
+.lc-event-row td{box-shadow: inset 0 0 0 9999px rgba(79,168,233,.06);}
+.lc-event-badge{display:inline-block;padding:2px 6px;border-radius:999px;background:rgba(23,63,105,.08);font-size:11px;}
+  </style>
+</head>
+<body>
+<!-- ADMIN HEADER (organizer) -->
+<header class="lc-admin-header uk-background-default uk-box-shadow-small" uk-sticky="show-on-up: true; animation: uk-animation-slide-top">
+  <div class="uk-container uk-container-large">
+    <nav class="uk-navbar-container uk-navbar-transparent" uk-navbar>
+      <div class="uk-navbar-left">
+        <a class="uk-navbar-item uk-logo lc-admin-logo" href="/admin/">
+          <span class="lc-badge">LC</span>
+          <span class="uk-margin-small-left">LazaCup <span class="uk-text-muted">Admin</span></span>
+        </a>
+
+        <ul class="uk-navbar-nav uk-visible@m" id="adminNav">
+          <li><a href="/admin/organizer/tournaments.html">Турниры</a></li>
+          <li><a href="/admin/organizer/stages.html">Этапы</a></li>
+          <li><a href="/admin/organizer/stage-categories.html">Категории</a></li>
+          <li><a href="/admin/organizer/field-rules.html">Поля</a></li>
+          <li><a href="/admin/organizer/squads-import.html">Команды</a></li>
+          <li><a href="/admin/organizer/groups.html">Группы</a></li>
+          <li><a href="/admin/organizer/playoff.html">Плей-офф</a></li>
+          <li><a class="uk-disabled" href="/admin/organizer/schedule.html">Расписание</a></li>
+        </ul>
+      </div>
+
+      <div class="uk-navbar-right">
+        <div class="uk-navbar-item uk-visible@m">
+          <div class="uk-text-small uk-text-muted uk-margin-right" id="who"></div>
+        </div>
+
+        <div class="uk-navbar-item">
+          <button id="btnLogout" class="uk-button uk-button-default" type="button">
+            <span uk-icon="sign-out"></span> Выйти
+          </button>
+        </div>
+
+        <a class="uk-navbar-toggle uk-hidden@m" uk-toggle="target: #adminOffcanvas" href="#">
+          <span uk-navbar-toggle-icon></span>
+        </a>
+      </div>
+    </nav>
+  </div>
+</header>
+
+<div id="adminOffcanvas" uk-offcanvas="overlay: true">
+  <div class="uk-offcanvas-bar">
+    <button class="uk-offcanvas-close" type="button" uk-close></button>
+
+    <div class="uk-margin">
+      <div class="uk-text-small uk-text-muted uk-margin-right" id="who"></div>
+    </div>
+
+    <ul class="uk-nav uk-nav-default" id="adminNavMobile">
+      <li><a href="/admin/organizer/tournaments.html">Турниры</a></li>
+      <li><a class="uk-disabled" href="/admin/organizer/stages.html">Этапы</a></li>
+      <li><a href="/admin/organizer/stage-categories.html">Категории</a></li>
+      <li><a href="/admin/organizer/field-rules.html">Поля</a></li>
+      <li><a href="/admin/organizer/squads-import.html">Команды</a></li>
+      <li><a href="/admin/organizer/groups.html">Группы</a></li>
+      <li><a href="/admin/organizer/playoff.html">Плей-офф</a></li>
+      <li><a class="uk-disabled" href="/admin/organizer/schedule.html">Расписание</a></li>
+      <li class="uk-nav-divider"></li>
+      <li><a href="#" id="btnLogoutMobile">Выйти</a></li>
+    </ul>
+  </div>
+</div>
+<!-- /ADMIN HEADER (organizer) -->
+
+  <div class="uk-container uk-container-large uk-margin-large-top">
+    <h2 class="uk-margin-small">Расписание</h2>
+    <div class="uk-text-meta uk-margin-small-bottom">
+      Schedule Lab — генерация, ручные перестановки и сохранение в БД (<span class="uk-text-bold">schedule_items</span>).
+    </div>
+
+<div class="uk-card uk-card-default uk-card-body uk-box-shadow-small uk-margin">
+  <div class="uk-text-meta" id="stageLineDays"></div>
+
+  <ul class="uk-accordion-default uk-margin" uk-accordion="collapsible: true; multiple: false; active: -1">
+    <li>
+      <a class="uk-accordion-title" href="#">
+        Дни турнира <span class="uk-text-muted uk-text-small">(опционально)</span>
+        <span class="uk-text-bold" uk-accordion-icon></span>
+      </a>
+      <div class="uk-accordion-content">
+        <div class="uk-flex uk-flex-between uk-flex-middle uk-margin-small-bottom">
+          <div>
+            <div class="uk-text-small uk-text-muted">
+              Здесь можно изменить окно игрового времени и количество полей на конкретную дату (поверх дефолтов этапа).
+            </div>
+          </div>
+          <div class="uk-flex uk-flex-middle uk-grid-small" uk-grid>
+            <button class="uk-button uk-button-default" id="btnDaysReload" type="button">
+              <span uk-icon="refresh"></span> Пересчитать дни
+            </button>
+            <button class="uk-button uk-button-primary" id="btnDaysSave" type="button">
+              <span uk-icon="check"></span> Сохранить
+            </button>
+          </div>
+        </div>
+
+        <div id="daysBlock" class="uk-margin"></div>
+
+        <hr class="uk-margin">
+
+        <div class="uk-flex uk-flex-between uk-flex-middle uk-margin-small-bottom">
+          <div>
+            <div class="uk-text-small uk-text-muted">
+              Служебные события блокируют время сразу на всех полях этапа. MVP: без повторений и без привязки к отдельным полям.
+            </div>
+          </div>
+          <div class="uk-flex uk-flex-middle uk-grid-small" uk-grid>
+            <button class="uk-button uk-button-default" id="btnEventsReload" type="button">
+              <span uk-icon="refresh"></span> Обновить события
+            </button>
+            <button class="uk-button uk-button-default" id="btnEventsAdd" type="button">
+              <span uk-icon="plus"></span> Добавить событие
+            </button>
+            <button class="uk-button uk-button-primary" id="btnEventsSave" type="button">
+              <span uk-icon="check"></span> Сохранить события
+            </button>
+          </div>
+        </div>
+
+        <div id="eventsBlock" class="uk-margin-small-top"></div>
+      </div>
+    </li>
+  </ul>
+</div>
+
+    <div class="lc-schedule-lab">
+      <div class="uk-card uk-card-default uk-card-body uk-box-shadow-small uk-margin">
+        <div class="uk-grid-small" uk-grid>
+
+          <div class="uk-width-1-2@s uk-width-1-3@m">
+            <label class="uk-form-label">Этап</label>
+            <div class="uk-form-controls">
+              <select id="stage_id" class="uk-select"></select>
+            </div>
+          </div>
+
+          <div class="uk-width-1-2@s uk-width-1-3@m">
+            <label class="uk-form-label">Фаза</label>
+            <div class="uk-form-controls uk-margin-small-top">
+               <label><input class="uk-checkbox" type="checkbox" id="include_group" checked /> группы (phase=group)</label>
+              <!--<div class="uk-text-small muted uk-margin-small-top">Плей-офф генерируется отдельно: <span class="uk-text-bold">/admin/organizer/playoff.html</span></div> -->
+              <label style="margin-left:12px;">
+                <input class="uk-checkbox" type="checkbox" id="include_playoff" />
+                плей-офф (phase=playoff)
+              </label>
+
+            </div>
+          </div>
+
+          <div class="uk-width-1-2@s uk-width-1-3@m">
+            <label class="uk-form-label">Приоритет</label>
+            <div class="uk-form-controls">
+              <select id="prefer" class="uk-select">
+                <option value="single">Авто: максимум заполнения (сначала 4, пары — по необходимости)</option>
+                <option value="pair">Авто (наоборот): пары в приоритете, 4 поля — по необходимости</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="uk-width-1-2@s uk-width-1-3@m">
+            <label class="uk-form-label">Уплотнение 12/34</label>
+            <div class="uk-form-controls">
+              <select id="mix_12_34" class="uk-select">
+                <option value="OFF">OFF — без уплотнения</option>
+                <option value="A" selected>AUTO (A) — если даёт пользу</option>
+                <option value="HARD">HARD — можно двигать 1↔2↔3↔4 внутри слота</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="uk-width-1-2@s uk-width-1-3@m">
+            <label class="uk-form-label">Показывать</label>
+            <div class="uk-form-controls">
+              <select id="show" class="uk-select">
+                <option value="code">только коды</option>
+                <option value="teams" selected>коды + команды/схема</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="uk-width-1-2@s uk-width-1-3@m">
+            <label class="uk-form-label">Ограничения команд по времени</label>
+            <div class="uk-form-controls">
+              <button class="uk-button uk-button-default" id="btnConstraints">Настроить</button>
+              <div class="uk-text-small muted uk-margin-small-top">Для <span class="uk-text-bold">любого дня этапа</span>.</div>
+            </div>
+          </div>
+
+          <div class="uk-width-1-1">
+            <button id="btn_build" class="uk-button uk-button-primary">ПОСТРОИТЬ</button>
+            <button id="btn_copy" class="uk-button uk-button-default">КОПИРОВАТЬ JSON</button>
+            <button id="btn_save" class="uk-button uk-button-secondary">СОХРАНИТЬ В БД</button>
+
+            <label class="uk-margin-left uk-text-small">
+              <input class="uk-checkbox" type="checkbox" id="manual_mode">
+              Ручной режим (drag / swap)
+            </label>
+            <span id="status" class="uk-margin-left muted">…</span>
+
+          </div>
+        </div>
+      </div>
+
+      <div id="out"></div>
+    </div>
+  </div>
+<div id="manualIssues" class="uk-margin-small-top"></div>
+  <!-- Constraints modal (по выбранному дню этапа) -->
+  <div id="modalConstraints" uk-modal>
+    <div class="uk-modal-dialog uk-modal-dialog-large uk-modal-body">
+      <h3 class="uk-modal-title">Ограничения команды по дню / времени</h3>
+
+      <div class="uk-grid-small" uk-grid>
+        <div class="uk-width-1-2@s" id="cDayWrap">
+          <label class="uk-form-label">День</label>
+          <select class="uk-select" id="cDay"></select>
+          <div class="uk-text-meta">Ограничение задаётся для выбранного дня этапа (для всех смен этого дня).</div>
+        </div>
+
+        <div class="uk-width-1-2@s">
+          <label class="uk-form-label">Команда</label>
+          <select class="uk-select" id="cSquad"></select>
+        </div>
+
+        <div class="uk-width-1-1">
+          <label><input class="uk-checkbox" type="checkbox" id="cBlockDay"> Не играть в этот день</label>
+          <div class="uk-text-meta">Полный запрет на выбранную дату для этой команды.</div>
+        </div>
+
+        <div class="uk-width-1-1" id="cAllowForcedWrap" hidden>
+          <label><input class="uk-checkbox" type="checkbox" id="cAllowForcedDay"> Разрешить только как принудительный конфликт</label>
+          <div class="uk-text-meta">Обычная генерация и rescue всё равно будут искать другие дни. В этот день матч может появиться только на самом последнем forced-проходе и будет считаться нарушением.</div>
+        </div>
+
+        <div class="uk-width-1-2@s" id="cNotBeforeWrap">
+          <label class="uk-form-label">Не раньше времени</label>
+          <select class="uk-select" id="cNotBefore"></select>
+        </div>
+
+        <div class="uk-width-1-2@s" id="cNotAfterWrap">
+          <label class="uk-form-label">Не позже времени</label>
+          <select class="uk-select" id="cNotAfter"></select>
+        </div>
+
+        <div class="uk-width-1-1">
+          <label class="uk-form-label">Комментарий</label>
+          <input class="uk-input" id="cComment" placeholder="например: автобус, приедут к 10:30">
+        </div>
+      </div>
+
+      <div class="uk-margin-top uk-flex uk-flex-between uk-flex-middle uk-flex-wrap">
+        <div>
+          <button type="button" class="uk-button uk-button-primary" id="cSave">Сохранить</button>
+          <button type="button" class="uk-button uk-button-default uk-modal-close">Закрыть</button>
+        </div>
+        <div class="uk-flex uk-flex-middle uk-grid-small" uk-grid>
+          <div>
+            <label class="uk-text-meta"><input class="uk-checkbox" type="checkbox" id="cShowAllDays" checked> Показать все дни</label>
+          </div>
+          <div class="uk-text-meta" id="cHint"></div>
+        </div>
+      </div>
+
+      <hr class="uk-margin">
+
+      <div class="uk-overflow-auto">
+        <table class="uk-table uk-table-small uk-table-divider">
+          <thead>
+            <tr>
+              <th>ID</th><th>День</th><th>Команда</th><th>Ограничение</th><th>Комментарий</th><th></th>
+            </tr>
+          </thead>
+          <tbody id="cList"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <script src="/admin/_admin.js?v=4"></script>
+
+  <script>
+    Admin.initAdminHeader('organizer');
+
+/**
+ * Days Editor (перенесено из schedule_old.html)
+ * Изолировано, не влияет на Schedule Lab.
+ */
+(() => {
+  const API_CURRENT = '/api/tournament/current.php';
+  const API_DAYS    = '/api/tournament/stage_days.php';
+  const API_SAVE    = '/api/tournament/stage_days_save.php';
+
+  const el = (id) => document.getElementById(id);
+
+  function notify(msg, status='primary') {
+    try { UIkit.notification({message: msg, status, pos:'top-right', timeout: 2500}); } catch(e){}
+  }
+
+  async function apiGet(url) {
+    const r = await fetch(url, {credentials:'same-origin', cache:'no-store'});
+    if (r.status === 401) { location.href = '/admin/login.html'; return null; }
+    const j = await r.json().catch(() => null);
+    if (!j || j.ok !== true) throw new Error((j && j.error) ? j.error : 'API error');
+    return j;
+  }
+
+  async function apiPost(url, data) {
+    const r = await fetch(url, {
+      method:'POST',
+      credentials:'same-origin',
+      cache:'no-store',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify(data)
+    });
+    if (r.status === 401) { location.href = '/admin/login.html'; return null; }
+    const j = await r.json().catch(() => null);
+    if (!j || j.ok !== true) throw new Error((j && j.error) ? j.error : 'API error');
+    return j;
+  }
+
+  const weekday = ['Вс','Пн','Вт','Ср','Чт','Пт','Сб'];
+  function dow(dateStr) {
+    const d = new Date(dateStr + 'T00:00:00');
+    return weekday[d.getDay()] || '';
+  }
+
+  function esc(s) {
+    return String(s ?? '')
+      .replaceAll('&','&amp;')
+      .replaceAll('<','&lt;')
+      .replaceAll('>','&gt;')
+      .replaceAll('"','&quot;')
+      .replaceAll("'",'&#039;');
+  }
+
+  let DEFAULTS = null;
+  let DAYS = [];
+
+  function rowHtml(item) {
+    const isCustom = !!item.is_custom;
+    const badge = isCustom
+      ? '<span class="lc-badge custom" title="Есть переопределение">кастом</span>'
+      : '<span class="lc-badge default" title="Дефолт этапа">дефолт</span>';
+
+    const activeChecked = item.is_active ? 'checked' : '';
+    const ds = esc(item.day_start || '');
+    const de = esc(item.day_end || '');
+    const df = Number(item.fields || 0);
+
+    return `
+      <tr data-date="${esc(item.day_date)}" data-custom="${isCustom ? '1':'0'}" data-reset="0">
+        <td>
+          <div class="uk-text-small uk-text-muted">${esc(dow(item.day_date))}</div>
+          <div><b>${esc(item.day_date)}</b></div>
+        </td>
+        <td>${badge}</td>
+        <td><input class="uk-input uk-form-small" type="time" step="60" value="${ds}" data-k="day_start"></td>
+        <td><input class="uk-input uk-form-small" type="time" step="60" value="${de}" data-k="day_end"></td>
+        <td><input class="uk-input uk-form-small" type="number" min="1" max="12" value="${df}" data-k="fields"></td>
+        <td class="uk-text-center"><input class="uk-checkbox" type="checkbox" ${activeChecked} data-k="is_active"></td>
+        <td class="uk-text-right">
+          <button class="uk-button uk-button-default uk-button-small" type="button" data-action="reset">
+            <span uk-icon="refresh"></span> Сброс
+          </button>
+        </td>
+      </tr>
+    `;
+  }
+
+  function render(items) {
+    const box = el('daysBlock');
+    if (!box) return;
+
+    if (!Array.isArray(items) || !items.length) {
+      box.innerHTML = '<div class="uk-alert uk-alert-warning">Дни не найдены (проверь даты этапа).</div>';
+      return;
+    }
+
+    const rows = items.map(rowHtml).join('');
+    box.innerHTML = `
+      <div class="uk-overflow-auto">
+        <table class="uk-table uk-table-small uk-table-divider lc-day-table">
+          <thead>
+            <tr>
+              <th style="min-width:140px;">Дата</th>
+              <th style="width:90px;">Статус</th>
+              <th style="width:130px;">Начало</th>
+              <th style="width:130px;">Конец</th>
+              <th style="width:110px;">Поля</th>
+              <th style="width:80px;" class="uk-text-center">Активен</th>
+              <th style="width:120px;"></th>
+            </tr>
+          </thead>
+          <tbody>${rows}</tbody>
+        </table>
+      </div>
+    `;
+    try { UIkit.update(box); } catch(e){}
+
+    box.querySelectorAll('button[data-action="reset"]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const tr = btn.closest('tr');
+        if (!tr || !DEFAULTS) return;
+
+        tr.dataset.reset = '1';
+        tr.dataset.custom = '0';
+        tr.querySelector('input[data-k="day_start"]').value = DEFAULTS.day_start;
+        tr.querySelector('input[data-k="day_end"]').value   = DEFAULTS.day_end;
+        tr.querySelector('input[data-k="fields"]').value    = String(DEFAULTS.fields);
+        tr.querySelector('input[data-k="is_active"]').checked = true;
+        tr.children[1].innerHTML = '<span class="lc-badge default" title="Дефолт этапа">дефолт</span>';
+
+        notify('Строка помечена на сброс (нажми «Сохранить»)', 'primary');
+      });
+    });
+  }
+
+  async function loadDaysForStage(stageId) {
+    stageId = Number(stageId || 0);
+    if (!stageId) throw new Error('Нет stage_id');
+
+    const j = await apiGet(`${API_DAYS}?stage_id=${stageId}`);
+    DEFAULTS = j.defaults;
+    DAYS = j.items || [];
+    render(DAYS);
+
+    // (опционально) выводим строку этапа
+    const st = j.stage || null;
+    if (el('stageLineDays') && st && (st.name || st.id)) {
+      const range = (st.start_date && st.end_date) ? ` (${st.start_date} — ${st.end_date})` : '';
+      el('stageLineDays').textContent = `Этап: ${st.name || ('#'+st.id)}${range}`;
+    }
+  }
+
+  async function saveAll(stageId) {
+    stageId = Number(stageId || 0);
+    if (!stageId) return;
+
+    const rows = Array.from(el('daysBlock').querySelectorAll('tbody tr'));
+    const items = rows.map(tr => {
+      const day_date = tr.dataset.date;
+      const day_start = tr.querySelector('input[data-k="day_start"]').value || '';
+      const day_end   = tr.querySelector('input[data-k="day_end"]').value || '';
+      const fields    = parseInt(tr.querySelector('input[data-k="fields"]').value, 10) || 0;
+      const is_active = tr.querySelector('input[data-k="is_active"]').checked ? 1 : 0;
+      const use_default = (tr.dataset.reset === '1') ? 1 : 0;
+      return { day_date, day_start, day_end, fields, is_active, use_default };
+    });
+
+    await apiPost(API_SAVE, { stage_id: stageId, items });
+    notify('Дни сохранены', 'success');
+  }
+
+  // публичные методы (чтобы связаться с Schedule Lab без зависимости)
+  window.LC_DaysEditor = {
+    load: loadDaysForStage,
+    save: saveAll,
+  };
+
+  // биндим кнопки (сам модуль не знает про stage select)
+  document.addEventListener('DOMContentLoaded', () => {
+    const btnR = el('btnDaysReload');
+    const btnS = el('btnDaysSave');
+    if (btnR) btnR.addEventListener('click', async () => {
+      try {
+        const stageId = Number(document.getElementById('stage_id')?.value || 0);
+        await loadDaysForStage(stageId);
+        notify('Дни пересчитаны', 'primary');
+      } catch (e) {
+        notify(e.message || 'Ошибка', 'danger');
+      }
+    });
+    if (btnS) btnS.addEventListener('click', async () => {
+      try {
+        const stageId = Number(document.getElementById('stage_id')?.value || 0);
+        await saveAll(stageId);
+        // ВАЖНО: мы НЕ вызываем Schedule Lab build() отсюда, чтобы ничего не ломать.
+        // Если захочешь — добавим аккуратный reload каркаса отдельной строкой.
+      } catch (e) {
+        notify(e.message || 'Ошибка', 'danger');
+      }
+    });
+  });
+})();
+
+
+
+/**
+ * Stage Events Editor (служебные события поверх расписания)
+ */
+(() => {
+  const API_EVENTS = '/api/tournament/stage_events.php';
+  const API_SAVE   = '/api/tournament/stage_events_save.php';
+
+  const el = (id) => document.getElementById(id);
+
+  function notify(msg, status='primary') {
+    try { UIkit.notification({message: msg, status, pos:'top-right', timeout: 2500}); } catch(e){}
+  }
+
+  async function apiGet(url) {
+    const r = await fetch(url, {credentials:'same-origin', cache:'no-store'});
+    if (r.status === 401) { location.href = '/admin/login.html'; return null; }
+    const j = await r.json().catch(() => null);
+    if (!j || j.ok !== true) throw new Error((j && j.error) ? j.error : 'API error');
+    return j;
+  }
+
+  async function apiPost(url, data) {
+    const r = await fetch(url, {
+      method:'POST',
+      credentials:'same-origin',
+      cache:'no-store',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify(data)
+    });
+    if (r.status === 401) { location.href = '/admin/login.html'; return null; }
+    const j = await r.json().catch(() => null);
+    if (!j || j.ok !== true) throw new Error((j && j.error) ? j.error : 'API error');
+    return j;
+  }
+
+  function esc(s) {
+    return String(s ?? '')
+      .replaceAll('&','&amp;')
+      .replaceAll('<','&lt;')
+      .replaceAll('>','&gt;')
+      .replaceAll('"','&quot;')
+      .replaceAll("'",'&#039;');
+  }
+
+  let ALLOWED_DATES = [];
+  let ITEMS = [];
+
+  function buildDateOptions(selected){
+    return (ALLOWED_DATES || []).map(d => `<option value="${esc(d)}" ${String(selected||'') === String(d) ? 'selected' : ''}>${esc(d)}</option>`).join('');
+  }
+
+  function rowHtml(item, idx) {
+    const types = {
+      opening: 'Открытие',
+      closing: 'Закрытие',
+      break: 'Перерыв',
+      awarding: 'Награждение',
+      custom: 'Своё',
+    };
+    const typeOptions = Object.entries(types).map(([val, label]) => `<option value="${esc(val)}" ${String(item.event_type||'custom') === val ? 'selected' : ''}>${esc(label)}</option>`).join('');
+    return `
+      <tr data-idx="${idx}">
+        <td><select class="uk-select uk-form-small" data-k="event_date">${buildDateOptions(item.event_date || '')}</select></td>
+        <td><input class="uk-input uk-form-small" type="time" step="60" value="${esc(item.time_from || '')}" data-k="time_from"></td>
+        <td><input class="uk-input uk-form-small" type="time" step="60" value="${esc(item.time_to || '')}" data-k="time_to"></td>
+        <td><select class="uk-select uk-form-small" data-k="event_type">${typeOptions}</select></td>
+        <td><input class="uk-input uk-form-small" type="text" value="${esc(item.title || '')}" data-k="title" placeholder="например: ОТКРЫТИЕ ФЕСТИВАЛЯ"></td>
+        <td class="uk-text-center"><input class="uk-checkbox" type="checkbox" ${item.is_active ? 'checked' : ''} data-k="is_active"></td>
+        <td class="uk-text-right">
+          <button class="uk-button uk-button-danger uk-button-small" type="button" data-action="remove">
+            <span uk-icon="trash"></span>
+          </button>
+        </td>
+      </tr>
+    `;
+  }
+
+  function render(items) {
+    const box = el('eventsBlock');
+    if (!box) return;
+
+    if (!Array.isArray(ALLOWED_DATES) || !ALLOWED_DATES.length) {
+      box.innerHTML = '<div class="uk-alert uk-alert-warning">Сначала задайте даты этапа.</div>';
+      return;
+    }
+
+    const rows = (Array.isArray(items) ? items : []).map((item, idx) => rowHtml(item, idx)).join('');
+    box.innerHTML = `
+      <div class="uk-overflow-auto">
+        <table class="uk-table uk-table-small uk-table-divider">
+          <thead>
+            <tr>
+              <th style="min-width:140px;">День</th>
+              <th style="width:120px;">От</th>
+              <th style="width:120px;">До</th>
+              <th style="width:140px;">Тип</th>
+              <th>Название</th>
+              <th style="width:90px;" class="uk-text-center">Активно</th>
+              <th style="width:70px;"></th>
+            </tr>
+          </thead>
+          <tbody>${rows || `<tr><td colspan="7" class="uk-text-center uk-text-muted">Событий пока нет</td></tr>`}</tbody>
+        </table>
+      </div>
+    `;
+    try { UIkit.update(box); } catch(e){}
+
+    box.querySelectorAll('button[data-action="remove"]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const tr = btn.closest('tr');
+        if (!tr) return;
+        const idx = Number(tr.dataset.idx || -1);
+        if (idx < 0) return;
+        ITEMS.splice(idx, 1);
+        render(ITEMS);
+      });
+    });
+  }
+
+  async function load(stageId) {
+    stageId = Number(stageId || 0);
+    if (!stageId) throw new Error('Нет stage_id');
+    const j = await apiGet(`${API_EVENTS}?stage_id=${stageId}`);
+    ALLOWED_DATES = Array.isArray(j.allowed_dates) ? j.allowed_dates : [];
+    ITEMS = Array.isArray(j.items) ? j.items : [];
+    render(ITEMS);
+  }
+
+  function addRow() {
+    const firstDate = (ALLOWED_DATES && ALLOWED_DATES[0]) ? ALLOWED_DATES[0] : '';
+    ITEMS.push({
+      event_date: firstDate,
+      time_from: '09:00',
+      time_to: '09:30',
+      event_type: 'custom',
+      title: '',
+      is_active: 1,
+    });
+    render(ITEMS);
+  }
+
+  async function save(stageId) {
+    stageId = Number(stageId || 0);
+    if (!stageId) throw new Error('Нет stage_id');
+
+    const rows = Array.from((el('eventsBlock')?.querySelectorAll('tbody tr[data-idx]')) || []);
+    const items = rows.map(tr => ({
+      event_date: tr.querySelector('[data-k="event_date"]')?.value || '',
+      time_from: tr.querySelector('[data-k="time_from"]')?.value || '',
+      time_to: tr.querySelector('[data-k="time_to"]')?.value || '',
+      event_type: tr.querySelector('[data-k="event_type"]')?.value || 'custom',
+      title: tr.querySelector('[data-k="title"]')?.value || '',
+      is_active: tr.querySelector('[data-k="is_active"]')?.checked ? 1 : 0,
+    }));
+
+    const j = await apiPost(API_SAVE, { stage_id: stageId, items });
+    ITEMS = Array.isArray(j.items) ? j.items : items;
+    render(ITEMS);
+    notify('События сохранены', 'success');
+  }
+
+  window.LC_StageEventsEditor = { load, save, addRow };
+
+  document.addEventListener('DOMContentLoaded', () => {
+    el('btnEventsReload')?.addEventListener('click', async () => {
+      try {
+        const stageId = Number(document.getElementById('stage_id')?.value || 0);
+        await load(stageId);
+        notify('События обновлены', 'primary');
+      } catch (e) {
+        notify(e.message || 'Ошибка', 'danger');
+      }
+    });
+    el('btnEventsAdd')?.addEventListener('click', () => {
+      addRow();
+    });
+    el('btnEventsSave')?.addEventListener('click', async () => {
+      try {
+        const stageId = Number(document.getElementById('stage_id')?.value || 0);
+        await save(stageId);
+      } catch (e) {
+        notify(e.message || 'Ошибка', 'danger');
+      }
+    });
+  });
+})();
+
+// Schedule Lab (боевой organizer/schedule.html)
+(() => {
+  // ---------------------------------------------------------------------------
+  // API endpoints
+  // ---------------------------------------------------------------------------
+  const API_CURRENT = '/api/tournament/current.php';
+  const API_STAGES = '/api/tournament/stages.php';
+  const API_LAB = '/api/tournament/schedule_lab.php';
+  const API_SCHEDULE_SAVE = '/api/tournament/schedule_save.php';
+  const API_SCHEDULE_ITEMS = '/api/tournament/schedule_items.php';
+
+  const API_SQUADS = '/api/tournament/squads.php';
+  const API_CONS = '/api/tournament/squad_constraints.php';
+  const API_CONS_S = '/api/tournament/squad_constraints_save.php';
+  const API_CONS_D = '/api/tournament/squad_constraints_delete.php';
+
+  // ---------------------------------------------------------------------------
+  // DOM helpers
+  // ---------------------------------------------------------------------------
+  const $ = (id) => document.getElementById(id);
+  const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c)=>( {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c] ));
+
+  // ---------------------------------------------------------------------------
+  // State
+  // ---------------------------------------------------------------------------
+  let lastJson = null; // текущий JSON, который видит UI и сохраняем в БД
+
+  // caches
+  let labDaysCache = null;
+  let consCacheAll = null;
+  let squadsCache = null;
+
+  // coach palette
+  let coachNameById = new Map();
+  let coachColorCache = new Map();
+  let coachPaletteStageId = 0;
+
+  // manual (drag/swap)
+  let manualMode = false;
+  let dragMatchId = 0;
+  let lastDropCell = null;
+  let previewTimer = null;
+
+  // day blocks (group only)
+  let groupDayBlocks = [];
+  let constraintDaysCache = [];
+  let constraintSavedFlashId = 0;
+
+  // ---------------------------------------------------------------------------
+  // NOTIFICATIONS (единая точка для UIkit.notification + сводка проблем)
+  // ---------------------------------------------------------------------------
+  function notify(msg, status='primary', timeout=6500){
+    if (!msg) return;
+    try{
+      if (window.UIkit && UIkit.notification){
+        UIkit.notification(String(msg), { status, timeout });
+      }
+    }catch(e){}
+  }
+
+  function _reasonText(x){
+    if (!x) return '';
+    return String(x.msg || x.code || x.reason || x.error || '').trim();
+  }
+
+  function _uniqLines(lines){
+    const seen = new Set();
+    const out = [];
+    for (const s of (lines || [])){
+      const t = String(s || '').trim();
+      if (!t) continue;
+      const key = t.toLowerCase();
+      if (seen.has(key)) continue;
+      seen.add(key);
+      out.push(t);
+    }
+    return out;
+  }
+
+  // антиспам: один и тот же “снимок проблем” не повторяем
+  let _noticeSigLast = '';
+  function noticeOnce(sig, fn){
+    sig = String(sig || '');
+    if (!sig) return;
+    if (_noticeSigLast === sig) return;
+    _noticeSigLast = sig;
+    try{ fn && fn(); }catch(e){}
+  }
+
+  // сигнатура текущего состояния проблем (для антиспама)
+  function makeNoticeSig(j){
+    const meta = j?.meta || {};
+    const placed = Number(meta.placed || 0);
+
+    const unplaced = Array.isArray(j?.unplaced) ? j.unplaced.length : 0;
+
+    const coachConflicts =
+      Array.isArray(j?.coach_conflicts) ? j.coach_conflicts.length :
+      Array.isArray(meta?.coach_conflicts) ? meta.coach_conflicts.length :
+      Number(meta?.coach_conflicts_total || 0);
+
+    // violations считаем по DOM ПОСЛЕ applyConstraintHighlights()
+    const viol = document.querySelectorAll('td.is-violation').length;
+
+    // oob: считаем по МАТЧАМ (а не по наличию OOB-слотов в каркасе)
+    let oob = Number(meta.oob_matches || 0);
+
+    return [
+      Number(meta.saved || 0),
+      placed,
+      unplaced,
+      coachConflicts,
+      oob,
+      viol
+    ].join('|');
+  }
+
+  // сводный нотис “всё сразу” (unplaced / oob / coach_conflicts / violations)
+  function summarizeIssues(j){
+    if (!j?.ok) return;
+
+    const meta = j.meta || {};
+    const placed = Number(meta.placed || 0);
+
+    const unplaced = Array.isArray(j.unplaced) ? j.unplaced.length : 0;
+
+    const coachConflicts =
+      Array.isArray(j.coach_conflicts) ? j.coach_conflicts.length :
+      Array.isArray(meta.coach_conflicts) ? meta.coach_conflicts.length :
+      Number(meta.coach_conflicts_total || 0);
+
+    const viol = document.querySelectorAll('td.is-violation').length;
+
+    // oob = только реальные назначения вне диапазона
+    const oob = Number(meta.oob_matches || 0);
+
+    const parts = [];
+    let level = null;
+
+    if (unplaced > 0){
+      parts.push(`не влезло матчей: ${unplaced}`);
+      level = 'danger';
+    }
+    if (oob > 0){
+      parts.push(`матчи вне диапазона: ${oob}`);
+      level = 'danger';
+    }
+    if (coachConflicts > 0){
+      parts.push(`конфликты тренеров: ${coachConflicts}`);
+      if (!level) level = 'warning';
+    }
+    if (viol > 0){
+      parts.push(`нарушения ограничений: ${viol}`);
+      if (!level) level = 'warning';
+    }
+
+    if (!parts.length) return;
+    notify(`Внимание: ${parts.join(' · ')} (назначений: ${placed})`, level, 8000);
+  }
+
+  // ---------------------------------------------------------------------------
+  // Utils
+  // ---------------------------------------------------------------------------
+  function debounce(fn, ms=200){
+    clearTimeout(previewTimer);
+    previewTimer = setTimeout(fn, ms);
+  }
+
+  async function safeJson(res){
+    if (res.status === 401) { location.href = '/admin/login.html'; return {ok:false, error:'unauthorized'}; }
+    const txt = await res.text();
+    try { return JSON.parse(txt); } catch(e){
+      return { ok:false, error:'Bad JSON', raw:txt };
+    }
+  }
+
+  async function apiGet(url){
+    const res = await fetch(url, {credentials:'same-origin', cache:'no-store'});
+    return await safeJson(res);
+  }
+
+  async function apiPostJson(url, payload){
+    const res = await fetch(url, {
+      method:'POST',
+      credentials:'same-origin',
+      cache:'no-store',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify(payload || {})
+    });
+    return await safeJson(res);
+  }
+
+  function getStageId(){
+    return Number($('stage_id')?.value || 0);
+  }
+
+  function fillSelect(sel, items, getVal, getText, withEmpty=true){
+    sel.innerHTML = '';
+    if (withEmpty){
+      const o = document.createElement('option');
+      o.value = '';
+      o.textContent = '—';
+      sel.appendChild(o);
+    }
+    for (const it of (items || [])){
+      const o = document.createElement('option');
+      o.value = String(getVal(it));
+      o.textContent = String(getText(it));
+      sel.appendChild(o);
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // Query params to schedule_lab.php (buildUrl/buildParams)
+  // ---------------------------------------------------------------------------
+  function buildParams(extra){
+    const stage_id = Number($('stage_id')?.value || 0);
+    const prefer = $('prefer')?.value || 'single';
+    const mix = $('mix_12_34')?.value || 'A';
+    const show = $('show')?.value || 'teams';
+
+    let include_group = $('include_group')?.checked ? 1 : 0;
+    let include_playoff = $('include_playoff')?.checked ? 1 : 0;
+
+    // ВАЖНО: режимы генерации (галки) не должны влиять на показ уже сохранённого расписания.
+    // Сохранённое расписание мы грузим через schedule_items (см. buildSavedFromDb),
+    // а schedule_lab используется только как «каркас дней/матчей».
+    if (extra && typeof extra === 'object' && extra.force_all === 1){
+      include_playoff = 1;
+      include_group = 1;
+    }
+
+    const qs = new URLSearchParams();
+    qs.set('stage_id', String(stage_id));
+    qs.set('prefer', prefer);
+    qs.set('mix_12_34', mix);
+    qs.set('show', show);
+    qs.set('include_group', String(include_group));
+    qs.set('include_playoff', String(include_playoff));
+
+    // дополнительные флаги (например: load_saved=1)
+    if (extra && typeof extra === 'object'){
+      for (const [k,v] of Object.entries(extra)){
+        if (v === undefined || v === null) continue;
+        qs.set(String(k), String(v));
+      }
+    }
+    return qs;
+  }
+
+  function buildUrl(extra){
+    return `${API_LAB}?${buildParams(extra).toString()}`;
+  }
+
+  // ---------------------------------------------------------------------------
+  // Persist UI opts per stage (HARD/AUTO после reload)
+  // ---------------------------------------------------------------------------
+  function _optsKey(stageId){
+    return `lc_schedule_lab_opts_stage_${Number(stageId||0)}`;
+  }
+
+  function saveUiOpts(stageId){
+    stageId = Number(stageId||0);
+    if (!stageId) return;
+    const opts = {
+      prefer: $('prefer')?.value || 'single',
+      mix_12_34: $('mix_12_34')?.value || 'A',
+      show: $('show')?.value || 'teams',
+      include_group: !!$('include_group')?.checked,
+      include_playoff: !!$('include_playoff')?.checked,
+    };
+    try{ localStorage.setItem(_optsKey(stageId), JSON.stringify(opts)); }catch(e){}
+  }
+
+  function applyUiOpts(stageId){
+    stageId = Number(stageId||0);
+    if (!stageId) return false;
+    try{
+      const raw = localStorage.getItem(_optsKey(stageId));
+      if (!raw) return false;
+      const o = JSON.parse(raw);
+      if (o && typeof o === 'object'){
+        if (o.prefer) $('prefer').value = o.prefer;
+        if (o.mix_12_34) $('mix_12_34').value = o.mix_12_34;
+        if (o.show) $('show').value = o.show;
+        if (typeof o.include_group === 'boolean') $('include_group').checked = o.include_group;
+        if (typeof o.include_playoff === 'boolean') $('include_playoff').checked = o.include_playoff;
+        return true;
+      }
+    }catch(e){}
+    return false;
+  }
+
+  // ---------------------------------------------------------------------------
+  // Coach dots palette
+  // ---------------------------------------------------------------------------
+  function _hslToRgb(h, s, l){
+    h /= 360; s /= 100; l /= 100;
+    const hue2rgb = (p, q, t) => {
+      if (t < 0) t += 1;
+      if (t > 1) t -= 1;
+      if (t < 1/6) return p + (q - p) * 6 * t;
+      if (t < 1/2) return q;
+      if (t < 2/3) return p + (q - p) * (2/3 - t) * 6;
+      return p;
+    };
+    let r, g, b;
+    if (s === 0){
+      r = g = b = l;
+    } else {
+      const q = l < 0.5 ? l * (1 + s) : l + s - l * s;
+      const p = 2 * l - q;
+      r = hue2rgb(p, q, h + 1/3);
+      g = hue2rgb(p, q, h);
+      b = hue2rgb(p, q, h - 1/3);
+    }
+    return [Math.round(r*255), Math.round(g*255), Math.round(b*255)];
+  }
+
+  function _coachColor(coachId){
+    coachId = Number(coachId || 0);
+    if (!coachId) return null;
+    if (coachColorCache.has(coachId)) return coachColorCache.get(coachId);
+
+    const seed = (coachId * 2654435761) >>> 0;
+    let h = 170 + (seed % 141); // 170..310
+    h = 170 + (Math.floor((h - 170) / 6) * 6);
+    const [ar,ag,ab] = _hslToRgb(h, 72, 42);
+    const c = { accent: `rgb(${ar},${ag},${ab})` };
+    coachColorCache.set(coachId, c);
+    return c;
+  }
+
+  function _buildCoachNameMap(){
+    coachNameById = new Map();
+    if (!Array.isArray(squadsCache)) return;
+    for (const s of squadsCache){
+      const cid = Number(s.coach_id || 0);
+      if (!cid) continue;
+      const nm = (s.coach_name || '').trim();
+      if (nm && !coachNameById.has(cid)) coachNameById.set(cid, nm);
+    }
+  }
+
+  async function ensureCoachPalette(stageId){
+    if (coachPaletteStageId === stageId && coachNameById.size) return;
+    const sq = await apiGet(`${API_SQUADS}?stage_id=${stageId}`);
+    if (sq.ok){
+      squadsCache = sq.items || [];
+      _buildCoachNameMap();
+      coachPaletteStageId = stageId;
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // Constraints helpers (selected day, all shifts of that date)
+  // ---------------------------------------------------------------------------
+  function dayIdFromDateOnly(date){
+    const s = String(date || '').replace(/-/g,'');
+    return Number(s) || 0;
+  }
+
+  function buildGroupBlocksFromLab(){
+    const days = Array.isArray(labDaysCache?.days) ? labDaysCache.days : [];
+    const blocks = days.filter(d => d && d.block !== 'reserved');
+    blocks.sort((a,b)=>{
+      const da = String(a.date||'');
+      const db = String(b.date||'');
+      if (da !== db) return da.localeCompare(db);
+      return String(a.start||'').localeCompare(String(b.start||''));
+    });
+    groupDayBlocks = blocks.map(b => ({
+      date: String(b.date||''),
+      start: String(b.start||''),
+      end: String(b.end||''),
+      fields: Number(b.fields||0),
+      cols: Array.isArray(b.cols) ? b.cols.map(String) : [],
+      slots: Array.isArray(b.slots) ? b.slots.map(String) : [],
+    }));
+    return groupDayBlocks;
+  }
+
+  function buildConstraintDays(){
+    const byDate = new Map();
+    for (const b of (groupDayBlocks || [])){
+      const date = String(b?.date || '');
+      if (!date) continue;
+      if (!byDate.has(date)){
+        byDate.set(date, {
+          date,
+          dayId: dayIdFromDateOnly(date),
+          start: String(b?.start || ''),
+          end: String(b?.end || ''),
+          shifts: 0,
+          colsSet: new Set(),
+        });
+      }
+      const row = byDate.get(date);
+      row.shifts += 1;
+      const start = String(b?.start || '');
+      const end = String(b?.end || '');
+      if (start && (!row.start || start < row.start)) row.start = start;
+      if (end && (!row.end || end > row.end)) row.end = end;
+      for (const c of (Array.isArray(b?.cols) ? b.cols : [])){
+        const code = String(c || '');
+        if (code) row.colsSet.add(code);
+      }
+    }
+    constraintDaysCache = Array.from(byDate.values())
+      .sort((a,b)=>String(a.date).localeCompare(String(b.date)))
+      .map(row => ({
+        date: row.date,
+        dayId: row.dayId,
+        start: row.start,
+        end: row.end,
+        shifts: row.shifts,
+        cols: Array.from(row.colsSet).sort((a,b)=>String(a).localeCompare(String(b))),
+        fields: row.colsSet.size,
+      }));
+    return constraintDaysCache;
+  }
+
+  function getConstraintDayMeta(date){
+    const dd = String(date || '');
+    if (!dd) return null;
+    if (!constraintDaysCache.length) buildConstraintDays();
+    return constraintDaysCache.find(d => String(d.date || '') === dd) || null;
+  }
+
+  function getSelectedConstraintDate(){
+    const date = String($('cDay')?.value || '');
+    if (date) return date;
+    return (constraintDaysCache && constraintDaysCache.length) ? String(constraintDaysCache[0].date || '') : '';
+  }
+
+  function getSelectedConstraintDayId(){
+    return dayIdFromDateOnly(getSelectedConstraintDate());
+  }
+
+  function getBlocksForConstraintScope(date){
+    const dd = String(date || getSelectedConstraintDate() || '');
+    return groupDayBlocks.filter(b => String(b.date||'') === dd);
+  }
+
+  function buildGlobalDaySlots(blocks){
+    const uniq = new Set();
+    for (const b of (blocks || [])){
+      for (const t of (b.slots || [])) if (t) uniq.add(String(t));
+    }
+    const times = Array.from(uniq).sort((a,b)=>String(a).localeCompare(String(b)));
+    const map = {};
+    for (let i=0;i<times.length;i++) map[times[i]] = i+1;
+    return { times, map };
+  }
+
+  function globalSlotNoForTime(times, time, mode){
+    const t = String(time || '');
+    if (!t) return null;
+    if (mode === 'na'){
+      let last = 0;
+      for (let i=0;i<times.length;i++) if (String(times[i]) <= t) last = i+1;
+      return last;
+    }
+    for (let i=0;i<times.length;i++) if (String(times[i]) >= t) return i+1;
+    return times.length + 1;
+  }
+
+  async function ensureLabCache(opts){
+    const stageId = getStageId();
+    if (!stageId) return { ok:false, error:'stage_id is required' };
+    const loadSaved = (opts && opts.load_saved) ? 1 : 0;
+    const j = await apiGet(buildUrl({ load_saved: loadSaved, force_all: 1 }));
+    if (!j.ok) return j;
+    labDaysCache = j;
+    buildGroupBlocksFromLab();
+    if (!groupDayBlocks.length) return { ok:false, error:'Нет доступных дней (или всё reserved)' };
+    return { ok:true };
+  }
+
+  async function loadConstraintsAll(stageId){
+    const j = await apiGet(`${API_CONS}?stage_id=${stageId}`);
+    if (!j.ok) return { ok:false, error:j.error || 'ошибка', items:[], mapByDate:{}, mapByDayId:{} };
+
+    const mapByDate = {};
+    const mapByDayId = {};
+    for (const c of (j.items || [])){
+      const date = String(c.day_date || c.date || '');
+      const dayId = Number(c.day_id || 0) || 0;
+      const sid = Number(c.squad_id || 0);
+      if (!date || !sid) continue;
+
+      const entry = {
+        id: Number(c.id || 0),
+        nb: c.not_before_slot_no ? Number(c.not_before_slot_no) : null,
+        na: c.not_after_slot_no  ? Number(c.not_after_slot_no)  : null,
+        block_day: !!Number(c.block_day || 0),
+        allow_forced_day: !!Number(c.allow_forced_day || 0),
+        comment: String(c.comment || '')
+      };
+
+      if (dayId > 0){
+        if (!mapByDayId[dayId]) mapByDayId[dayId] = {};
+        mapByDayId[dayId][sid] = entry;
+      } else {
+        if (!mapByDate[date]) mapByDate[date] = {};
+        mapByDate[date][sid] = entry;
+      }
+    }
+
+    return { ok:true, items:(j.items||[]), mapByDate, mapByDayId };
+  }
+
+  async function loadConstraintsByScope(stageId, dayId, date, allDays=false){
+    const qs = new URLSearchParams();
+    qs.set('stage_id', String(stageId || 0));
+    if (allDays){
+      qs.set('all_days', '1');
+    } else {
+      if (Number(dayId || 0) > 0) qs.set('day_id', String(Number(dayId || 0)));
+      if (String(date || '')) qs.set('date', String(date || ''));
+    }
+    const j = await apiGet(`${API_CONS}?${qs.toString()}`);
+    if (!j.ok) return { ok:false, error:j.error || 'ошибка', items:[] };
+    return { ok:true, items:(j.items||[]) };
+  }
+
+  function constraintsSyncModeUI(){
+    const block = !!$('cBlockDay')?.checked;
+    const allowWrap = $('cAllowForcedWrap');
+    const allow = $('cAllowForcedDay');
+    const nb = $('cNotBefore');
+    const na = $('cNotAfter');
+    const nbWrap = $('cNotBeforeWrap');
+    const naWrap = $('cNotAfterWrap');
+
+    if (allowWrap) allowWrap.hidden = !block;
+    if (allow) {
+      allow.disabled = !block;
+      if (!block) allow.checked = false;
+    }
+    if (nb) nb.disabled = block;
+    if (na) na.disabled = block;
+    if (nbWrap) nbWrap.style.opacity = block ? '0.55' : '';
+    if (naWrap) naWrap.style.opacity = block ? '0.55' : '';
+  }
+
+  function constraintRangeText(item){
+    if (Number(item?.block_day || 0)) {
+      return Number(item?.allow_forced_day || 0)
+        ? 'Весь день (только принудительно)'
+        : 'Весь день';
+    }
+    const itemDate = String(item?.day_date || item?.date || '');
+    const dayBlocks = getBlocksForConstraintScope(itemDate);
+    const glob = buildGlobalDaySlots(dayBlocks);
+    const slotsForView = glob.times || [];
+    const nb = item?.not_before_slot_no ? Number(item.not_before_slot_no) : 0;
+    const na = item?.not_after_slot_no ? Number(item.not_after_slot_no) : 0;
+    const nbTxt = nb ? (slotsForView[nb-1] || ('slot#'+nb)) : '—';
+    const naTxt = na ? (slotsForView[na-1] || ('slot#'+na)) : '—';
+    return `${esc(nbTxt)} — ${esc(naTxt)}`;
+  }
+
+  function rebuildSlotSelects(){
+    const prevNb = String($('cNotBefore')?.value || '');
+    const prevNa = String($('cNotAfter')?.value || '');
+    const date = getSelectedConstraintDate();
+    const blocks = getBlocksForConstraintScope(date);
+    const seen = new Set();
+    const times = [];
+    for (const bb of blocks){
+      for (const t of (bb.slots||[])){
+        if (seen.has(t)) continue;
+        seen.add(t);
+        times.push(t);
+      }
+    }
+    times.sort((a,b)=>String(a).localeCompare(String(b)));
+    const opts = times.map(t=>({val:t, text:t}));
+    fillSelect($('cNotBefore'), opts, o=>o.val, o=>o.text, true);
+    fillSelect($('cNotAfter'),  opts, o=>o.val, o=>o.text, true);
+    if (prevNb && times.includes(prevNb)) $('cNotBefore').value = prevNb;
+    if (prevNa && times.includes(prevNa)) $('cNotAfter').value = prevNa;
+  }
+
+  async function constraintsRefreshList(opts={}){
+    const stageId = getStageId();
+    const tb = $('cList');
+    tb.innerHTML = '';
+
+    if (!stageId){
+      tb.innerHTML = `<tr><td colspan="6" class="muted">Не выбран этап</td></tr>`;
+      return [];
+    }
+
+    const date = getSelectedConstraintDate();
+    const dayId = getSelectedConstraintDayId();
+    const showAllDays = !!$('cShowAllDays')?.checked;
+
+    if (!showAllDays && !date){
+      tb.innerHTML = `<tr><td colspan="6" class="muted">Не выбран день</td></tr>`;
+      return [];
+    }
+
+    const r = await loadConstraintsByScope(stageId, dayId, date, showAllDays);
+    if (!r.ok){
+      tb.innerHTML = `<tr><td colspan="6" class="muted">Ошибка: ${esc(r.error)}</td></tr>`;
+      return [];
+    }
+
+    const items = Array.isArray(r.items) ? [...r.items] : [];
+    items.sort((a,b)=>{
+      const da = String(a?.day_date || a?.date || '');
+      const db = String(b?.day_date || b?.date || '');
+      if (da !== db) return da.localeCompare(db);
+      return Number(b?.id || 0) - Number(a?.id || 0);
+    });
+
+    if (!items.length){
+      tb.innerHTML = `<tr><td colspan="6" class="muted">Ограничений нет</td></tr>`;
+      return [];
+    }
+
+    for (const c of items){
+      const rowDate = String(c.day_date || c.date || '') || '—';
+      const range = constraintRangeText(c);
+      const tr = document.createElement('tr');
+      const isSaved = Number(opts.savedId || 0) > 0 && Number(c.id || 0) === Number(opts.savedId || 0);
+      if (isSaved){
+        tr.style.background = '#fff8d6';
+      }
+      tr.innerHTML = `
+        <td>${Number(c.id||0)}</td>
+        <td>${esc(rowDate)}</td>
+        <td>${esc(c.squad_name || ('#'+c.squad_id))}</td>
+        <td>${range}</td>
+        <td>${esc(c.comment || '')}</td>
+        <td><button type="button" class="uk-button uk-button-danger uk-button-small" data-del="${Number(c.id||0)}">Удалить</button></td>
+      `;
+      tb.appendChild(tr);
+      if (isSaved) {
+        requestAnimationFrame(()=>tr.scrollIntoView({block:'nearest', behavior:'smooth'}));
+      }
+    }
+
+    tb.querySelectorAll('button[data-del]').forEach(btn=>{
+      btn.addEventListener('click', async ()=>{
+        const id = Number(btn.dataset.del||0);
+        if (!id) return;
+        if (!confirm('Удалить ограничение?')) return;
+        const rr = await apiPostJson(API_CONS_D, { id });
+        if (!rr.ok){
+          notify(rr.error || 'Не смог удалить', 'danger');
+          return;
+        }
+        await constraintsRefreshList();
+        consCacheAll = null;
+        if (lastJson?.ok) await applyConstraintHighlights();
+        notify('Удалено', 'success');
+      });
+    });
+
+    return items;
+  }
+
+  async function constraintsOpenModal(){
+    const stageId = getStageId();
+    if (!stageId){
+      notify('Выбери этап', 'warning');
+      return;
+    }
+
+    $('cHint').textContent = 'загружаю сетку дней…';
+    const labOk = await ensureLabCache({load_saved:1});
+    if (!labOk.ok){
+      $('cHint').textContent = '';
+      notify(labOk.error || 'Не смог загрузить сетку', 'danger');
+      return;
+    }
+
+    const dayOptions = buildConstraintDays();
+    const day0 = dayOptions[0] || null;
+    if (!day0){
+      $('cHint').textContent = '';
+      notify('Нет доступных дней (или всё reserved)', 'warning');
+      return;
+    }
+
+    fillSelect(
+      $('cDay'),
+      dayOptions,
+      d=>d.date,
+      d=>`${d.date} • ${d.start}–${d.end} • смен:${d.shifts}${(d.cols&&d.cols.length)?` • поля:${d.cols.join('/')}`:''}`,
+      false
+    );
+
+    const currentDate = String($('cDay')?.value || '');
+    const selectedDate = dayOptions.some(d => String(d.date || '') === currentDate)
+      ? currentDate
+      : String(day0.date || '');
+    $('cDay').value = selectedDate;
+    if ($('cBlockDay')) $('cBlockDay').checked = false;
+    if ($('cAllowForcedDay')) $('cAllowForcedDay').checked = false;
+    constraintsSyncModeUI();
+
+    rebuildSlotSelects();
+
+    $('cHint').textContent = 'загружаю команды…';
+    if (!squadsCache){
+      const sq = await apiGet(`${API_SQUADS}?stage_id=${stageId}`);
+      if (!sq.ok){
+        $('cHint').textContent = '';
+        notify(sq.error || 'Не смог загрузить команды', 'danger');
+        return;
+      }
+      squadsCache = sq.items || [];
+      _buildCoachNameMap();
+    }
+    fillSelect($('cSquad'), squadsCache, it=>it.id, it=>`${it.category} — ${it.name}`, false);
+
+    $('cHint').textContent = 'загружаю ограничения…';
+    await constraintsRefreshList();
+    $('cHint').textContent = '';
+    UIkit.modal('#modalConstraints').show();
+  }
+
+  async function constraintsSave(){
+    const stageId = getStageId();
+    const squadId = Number($('cSquad')?.value || 0);
+    const blockDay = !!$('cBlockDay')?.checked;
+    const allowForcedDay = blockDay && !!$('cAllowForcedDay')?.checked;
+    const nbRaw = blockDay ? '' : ($('cNotBefore')?.value || '');
+    const naRaw = blockDay ? '' : ($('cNotAfter')?.value || '');
+    const comment = String($('cComment')?.value || '').trim();
+
+    if (!stageId){ notify('Не выбран этап', 'warning'); return; }
+    if (!squadId){ notify('Выбери команду', 'warning'); return; }
+    if (!blockDay && nbRaw && naRaw && String(nbRaw) > String(naRaw)){
+      notify('Не раньше > Не позже (время)', 'danger');
+      return;
+    }
+
+    const all = await loadConstraintsAll(stageId);
+    if (!all.ok){ notify(all.error || 'Не смог загрузить ограничения', 'danger'); return; }
+
+    const date = getSelectedConstraintDate();
+    if (!date){ notify('Не выбран день', 'warning'); return; }
+
+    const blocksToApply = getBlocksForConstraintScope(date);
+    const glob = buildGlobalDaySlots(blocksToApply);
+    if (!glob.times.length){
+      notify('Для выбранного дня нет доступных слотов', 'warning');
+      return;
+    }
+
+    const nbSlot = (!blockDay && nbRaw) ? globalSlotNoForTime(glob.times, nbRaw, 'nb') : null;
+    const naSlot = (!blockDay && naRaw) ? globalSlotNoForTime(glob.times, naRaw, 'na') : null;
+    if (!blockDay && nbSlot !== null && naSlot !== null && nbSlot > 0 && naSlot > 0 && nbSlot > naSlot){
+      notify('Не раньше > Не позже', 'danger');
+      return;
+    }
+
+    const dayId = getSelectedConstraintDayId() || dayIdFromDateOnly(date);
+    const existingEntry = (all.mapByDayId?.[dayId] || {})[squadId] || (all.mapByDate?.[date] || {})[squadId] || null;
+    const id = existingEntry ? Number(existingEntry.id || 0) : 0;
+
+    const r = await apiPostJson(API_CONS_S, {
+      id: id || 0,
+      stage_id: stageId,
+      squad_id: squadId,
+      day_id: dayId,
+      date: date,
+      not_before_slot_no: (blockDay || nbSlot === null ? null : nbSlot),
+      not_after_slot_no: (blockDay || naSlot === null ? null : naSlot),
+      block_day: blockDay ? 1 : 0,
+      allow_forced_day: allowForcedDay ? 1 : 0,
+      comment: comment
+    });
+    if (!r.ok){ notify(r.error || `Не смог сохранить (${date})`, 'danger'); return; }
+
+    constraintSavedFlashId = Number(r.id || 0);
+    if ($('cComment')) $('cComment').value = '';
+    const refreshed = await constraintsRefreshList({ savedId: constraintSavedFlashId });
+    consCacheAll = null;
+    if (lastJson?.ok) await applyConstraintHighlights();
+    constraintsSyncModeUI();
+
+    const found = constraintSavedFlashId > 0
+      ? (refreshed || []).some(x => Number(x.id || 0) === constraintSavedFlashId)
+      : (refreshed || []).some(x => Number(x.squad_id || 0) === squadId && String(x.day_date || x.date || '') === date);
+
+    if (!found){
+      notify(`Сохранено (${date}), но запись не найдена в текущем списке`, 'warning', 7000);
+      return;
+    }
+    notify(`Сохранено (${date})`, 'success');
+  }
+
+  // ---------------------------------------------------------------------------
+  // Move preview + local apply
+  // ---------------------------------------------------------------------------
+  function findDayByDate(j, date){
+    return (j.days || []).find(d => d.date === date) || null;
+  }
+
+  function timeBySlot(j, date, slotNo){
+    // Для подсветок/ограничений используем глобальную шкалу по дате,
+    // но reserved-блоки обязаны быть исключены (иначе время съезжает на "↳ 12/34").
+    const dd = String(date || '');
+    const idx = Number(slotNo) - 1;
+    if (!dd || idx < 0) return null;
+
+    if (!timeBySlot._cache) timeBySlot._cache = {};
+    if (!timeBySlot._cache[dd]){
+      const blocks = (j?.days || []).filter(x => x && String(x.date||'') === dd && String(x.block||'') !== 'reserved');
+      timeBySlot._cache[dd] = buildGlobalDaySlots(blocks);
+    }
+    const times = timeBySlot._cache[dd]?.times || [];
+    if (idx >= times.length) return null;
+    return times[idx];
+  }
+
+  function findAssignmentByMatchId(j, matchId){
+    const arr = Array.isArray(j.assignments) ? j.assignments : [];
+    return arr.find(x => Number(x.match_id) === Number(matchId)) || null;
+  }
+
+  function clearDropMarks(){
+    document.querySelectorAll('.drop-ok,.drop-bad').forEach(el=>{
+      el.classList.remove('drop-ok','drop-bad');
+      el.removeAttribute('title');
+    });
+  }
+
+  async function movePreview(move, assignmentsOverride=null){
+    const url = `${API_LAB}?action=move_preview`;
+    const payload = {
+      stage_id: getStageId(),
+      assignments: assignmentsOverride || (lastJson?.assignments || []),
+      move
+    };
+    const res = await fetch(url, {
+      method:'POST',
+      credentials:'same-origin',
+      cache:'no-store',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify(payload)
+    });
+    return await safeJson(res);
+  }
+
+  // ---------------------------------------------------------------------------
+  // Manual issues UI (panel + highlights)
+  // ---------------------------------------------------------------------------
+  function _reasonTextFull(x){
+    if (!x) return '';
+    const code = x.code ? `[${x.code}] ` : '';
+    const msg = x.msg || '';
+    const withIds = Array.isArray(x.with) && x.with.length ? ` (with: ${x.with.join(', ')})` : '';
+    return (code + msg + withIds).trim();
+  }
+
+  function hasReservedReason(resp){
+    const reasons = Array.isArray(resp?.reasons) ? resp.reasons : [];
+    return reasons.some(x => String(x?.code || '') === 'EVENT_RESERVED');
+  }
+
+  // ---------------------------------------------------------------------------
+  // Manual issues highlight state
+  // ---------------------------------------------------------------------------
+  // Эти подсветки должны переживать render(lastJson), иначе после любого следующего SWAP/MOVE
+  // "старые" нарушения визуально пропадают, хотя логически всё ещё есть.
+  const manualIssueKeys = new Set(); // date|field|slot_index — красные (ошибка)
+  const manualTouchKeys = new Set(); // date|field|slot_index — синие (участвовали в переносе)
+
+  function _cellKey(date, field, slotIndex){
+    return `${date}|${field}|${slotIndex}`;
+  }
+
+  function _tdKey(td){
+    if (!td) return '';
+    const date = td.dataset.date || '';
+    const field = td.dataset.field || '';
+    const si = td.dataset.slotIndex || '';
+    return (date && field && si) ? `${date}|${field}|${si}` : '';
+  }
+
+  function reapplyManualHighlights(){
+    // применяем сохранённые подсветки к текущему DOM (после render)
+    for (const key of manualIssueKeys){
+      const [date, field, si] = String(key).split('|');
+      if (!date || !field || !si) continue;
+      const td = document.querySelector(
+        `td[data-date="${CSS.escape(date)}"][data-field="${CSS.escape(field)}"][data-slot-index="${CSS.escape(si)}"]`
+      );
+      if (td){
+        td.classList.add('lc-issue-td');
+        td.classList.remove('lc-touch-td');
+      }
+    }
+    for (const key of manualTouchKeys){
+      // touch не должен перебивать issue
+      const [date, field, si] = String(key).split('|');
+      if (!date || !field || !si) continue;
+      const td = document.querySelector(
+        `td[data-date="${CSS.escape(date)}"][data-field="${CSS.escape(field)}"][data-slot-index="${CSS.escape(si)}"]`
+      );
+      if (td && !td.classList.contains('lc-issue-td')){
+        td.classList.add('lc-touch-td');
+      }
+    }
+  }
+
+
+ function clearManualIssues(){
+  const box = $('manualIssues');
+  if (box) box.innerHTML = '';
+}
+
+function clearSlotHighlights(){
+  // Сбрасываем ТОЛЬКО временную подсветку (слоты, которые участвовали в последнем MOVE/SWAP).
+  // Ошибочная подсветка lc-issue-td должна жить, пока реально существует нарушение.
+  manualTouchKeys.clear();
+  document.querySelectorAll('td.lc-touch-td').forEach(td => td.classList.remove('lc-touch-td'));
+}
+
+function clearIssueHighlights(){
+  // Полный сброс подсветки ошибок (использовать только когда уверены, что нарушений больше нет).
+  manualIssueKeys.clear();
+  document.querySelectorAll('td.lc-issue-td').forEach(td => td.classList.remove('lc-issue-td'));
+}
+
+function tdByCell(cell){
+  if (!cell) return null;
+  const date = String(cell.date || '');
+  const field = String(cell.field_code || '');
+  const si = Number(cell.slot_index || cell.slot_no || 0); // slot_no у нас = slot_index для API
+  if (!date || !field || !si) return null;
+
+  return document.querySelector(
+    `td[data-date="${CSS.escape(date)}"][data-field="${CSS.escape(field)}"][data-slot-index="${si}"]`
+  );
+}
+
+function highlightIssueSlotsFromReasons(resp, to, from, midDrag, targetMid){
+  clearSlotHighlights();
+
+  if (resp?.ok) return;
+
+  const reasons = Array.isArray(resp?.reasons) ? resp.reasons : [];
+
+  // gather with match_ids
+  const withIds = [];
+  for (const r of reasons){
+    if (Array.isArray(r?.with)){
+      for (const v of r.with){
+        const n = Number(v || 0);
+        if (n) withIds.push(n);
+      }
+    }
+  }
+
+  const errorTdSet = new Set();
+
+  // helper: mark cell of match_id as error
+  const markMatchIdAsError = (mid) => {
+    const id = Number(mid || 0);
+    if (!id || !window.lastJson || !Array.isArray(lastJson.assignments)) return;
+    const a = lastJson.assignments.find(x => Number(x?.match_id || 0) === id);
+    if (!a) return;
+
+    const date = String(a.date || '');
+    const field = String(a.field_code || '');
+    const si = Number(a.slot_index || 0);
+    if (!date || !field || !si) return;
+
+    const td = document.querySelector(
+      `td[data-date="${CSS.escape(date)}"][data-field="${CSS.escape(field)}"][data-slot-index="${si}"]`
+    );
+    if (td){
+      td.classList.add('lc-issue-td');
+      td.classList.remove('lc-touch-td');
+      manualIssueKeys.add(_cellKey(date, field, si));
+      errorTdSet.add(td);
+    }
+  };
+
+  // 1) red: all "with"
+  if (withIds.length){
+    for (const mid of Array.from(new Set(withIds))){
+      markMatchIdAsError(mid);
+    }
+  }
+
+  // 2) special rule for COACH_CONFLICT:
+  // make targetMid (occupied cell) red, dragged cell only touch.
+  const hasCoachConflict = reasons.some(x => String(x?.code || '') === 'COACH_CONFLICT');
+if (hasCoachConflict && midDrag){
+  markMatchIdAsError(midDrag); // <-- красим 136, а не 123
+}
+
+  // 3) to/from = touch (only if not red)
+  const tdTo = tdByCell(to);
+  const tdFrom = tdByCell(from);
+
+  if (tdTo && !errorTdSet.has(tdTo)) { tdTo.classList.add('lc-touch-td'); manualTouchKeys.add(_tdKey(tdTo)); }
+  if (tdFrom && !errorTdSet.has(tdFrom)) { tdFrom.classList.add('lc-touch-td'); manualTouchKeys.add(_tdKey(tdFrom)); }
+
+  // 4) IMPORTANT: убираем старый fallback, который красил to/from.
+  // НИЧЕГО больше не красим "на всякий случай".
+}
+
+// оставить можно (на будущее), но НИГДЕ не вызывать при manual issues
+function highlightMatchIds(ids){
+  const list = (ids || []).map(x => Number(x || 0)).filter(Boolean);
+
+  for (const id of list){
+    const el =
+      document.querySelector(`[data-mid="${id}"]`) ||
+      document.querySelector(`[data-match-id="${id}"]`) ||
+      document.querySelector(`[data-id="${id}"]`) ||
+      document.querySelector(`.match[data-mid="${id}"], .match[data-match-id="${id}"], .match[data-id="${id}"]`) ||
+      document.querySelector(`.match-item[data-mid="${id}"], .match-item[data-match-id="${id}"], .match-item[data-id="${id}"]`);
+
+    if (el){
+      el.classList.add('lc-issue-match');
+      continue; // ВАЖНО: td тут не красим
+    }
+
+    if (!window.lastJson || !Array.isArray(lastJson.assignments)) continue;
+    const a = lastJson.assignments.find(x => Number(x?.match_id || 0) === id);
+    if (!a) continue;
+
+    const date = String(a.date || '');
+    const field = String(a.field_code || '');
+    const slotIndex = Number(a.slot_index || 0);
+    if (!date || !field || !slotIndex) continue;
+
+    const td = document.querySelector(
+      `td[data-date="${CSS.escape(date)}"][data-field="${CSS.escape(field)}"][data-slot-index="${slotIndex}"]`
+    );
+    if (td) td.classList.add('lc-issue-td');
+  }
+}
+
+function showManualIssues(title, r){
+  const box = $('manualIssues');
+  if (!box) return;
+
+  const reasons = Array.isArray(r?.reasons) ? r.reasons : [];
+  const lines = reasons.map(_reasonTextFull).filter(Boolean);
+
+  if (!lines.length && r?.error) lines.push(String(r.error));
+
+  const html = `
+    <div class="uk-alert-danger" uk-alert>
+      <a class="uk-alert-close" uk-close></a>
+      <div class="uk-text-bold">${esc(title || 'Нарушения')}</div>
+      ${lines.length ? `<ul class="uk-list uk-list-bullet uk-margin-small-top">${lines.map(s=>`<li>${esc(s)}</li>`).join('')}</ul>` : ''}
+    </div>
+  `;
+  box.innerHTML = html;
+}
+
+  function _uniqNums(arr){
+    const out = [];
+    const s = new Set();
+    for (const v of (arr || [])){
+      const n = Number(v || 0);
+      if (!n || s.has(n)) continue;
+      s.add(n); out.push(n);
+    }
+    return out;
+  }
+
+  // ---------------------------------------------------------------------------
+  // Time normalization (manual DnD must match grid keys exactly)
+  // ---------------------------------------------------------------------------
+  function normTime(v){
+    v = String(v || '').trim();
+    if (!v) return '';
+    const m = v.match(/(\d{1,2}):(\d{2})/);
+    if (!m) return v;
+    const hh = String(m[1]).padStart(2,'0');
+    const mm = String(m[2]);
+    return `${hh}:${mm}`;
+  }
+
+function cellTimeFromTd(td){
+  if (!td) return '';
+  const tr = td.closest('tr');
+  if (!tr) return '';
+  // В data-строках первая ячейка — время (09:00, 10:05...)
+  const first = tr.children && tr.children.length ? tr.children[0] : null;
+  return normTime(first ? first.textContent : '');
+}
+
+function cellInfoFromTd(td){
+  if (!td) return null;
+  const date = td.dataset.date || '';
+  const slot_local = Number(td.dataset.slot || 0);
+  const slot_index = Number(td.dataset.slotIndex || 0);
+  const field_code = td.dataset.field || '';
+  const time = normTime(td.dataset.time || cellTimeFromTd(td) || '');
+  const day_start = td.dataset.dayStart || '';
+  const day_end = td.dataset.dayEnd || '';
+  return { date, slot_local, slot_index, field_code, time, day_start, day_end };
+}
+
+function applySwapLocally(midA, midB, to, from){
+  const a = findAssignmentByMatchId(lastJson, midA);
+  const b = findAssignmentByMatchId(lastJson, midB);
+  if (!a || !b) return false;
+
+  a.date = String(to.date);
+  a.slot_index = Number(to.slot_index || 0);
+  a.slot_no = Number(to.slot_local || 0); // local for UI
+  a.field_code = String(to.field_code);
+  a.time = normTime(to.time || '');
+  a.day_start = String(to.day_start || '');
+  a.day_end = String(to.day_end || '');
+
+  b.date = String(from.date);
+  b.slot_index = Number(from.slot_index || 0);
+  b.slot_no = Number(from.slot_local || 0); // local for UI
+  b.field_code = String(from.field_code);
+  b.time = normTime(from.time || '');
+  b.day_start = String(from.day_start || '');
+  b.day_end = String(from.day_end || '');
+
+  return true;
+}
+
+
+  function applyMoveLocally(matchId, to){
+    const a = findAssignmentByMatchId(lastJson, matchId);
+    if (!a) return;
+
+    a.date = String(to.date);
+    a.slot_index = Number(to.slot_index || 0);
+    a.slot_no = Number(to.slot_local || a.slot_no || 0); // local for UI
+    a.field_code = String(to.field_code);
+
+    // Preserve day block for cases when one date has multiple windows
+    if (to.day_start !== undefined) a.day_start = String(to.day_start || '');
+    if (to.day_end   !== undefined) a.day_end   = String(to.day_end   || '');
+
+    // MANUAL MODE RULE: time must be exactly the grid row time (HH:MM).
+    a.time = normTime(to.time || '');
+    if (!a.time){
+      // last-resort fallback by GLOBAL slot index
+      a.time = normTime(timeBySlot(lastJson, a.date, (a.slot_index || a.slot_no)) || a.time || '');
+    }
+  }
+
+  function cloneAssignmentsFilteredOut(matchIds){
+    const set = new Set((matchIds || []).map(x=>Number(x||0)));
+    return (lastJson?.assignments || []).filter(a => !set.has(Number(a.match_id||0)));
+  }
+
+
+  // ---------------------------------------------------------------------------
+  // Клиентская валидация текущих назначений (через move_preview по каждому матчу)
+  // Цель: подсветка РЕАЛЬНЫХ нарушений должна жить до тех пор, пока нарушение существует,
+  // включая перезагрузку страницы и любые последующие MOVE/SWAP.
+  // ---------------------------------------------------------------------------
+
+  function _cellFromAssignment(a){
+    return { date: a.date, field_code: a.field_code, slot_index: a.slot_index, slot_no: a.slot_no };
+  }
+
+  // Подсветка “реальной” ошибки: только красное (touch не трогаем)
+  function markIssuesFromPreview(resp){
+    if (!resp || resp.ok) return 0;
+
+    const reasons = Array.isArray(resp.reasons) ? resp.reasons : [];
+    const withIds = [];
+    for (const r of reasons){
+      if (Array.isArray(r?.with)){
+        for (const v of r.with){
+          const n = Number(v || 0);
+          if (n) withIds.push(n);
+        }
+      }
+    }
+
+    let marked = 0;
+
+    if (withIds.length && window.lastJson && Array.isArray(lastJson.assignments)){
+      const uniq = Array.from(new Set(withIds));
+      for (const mid of uniq){
+        const a = lastJson.assignments.find(x => Number(x?.match_id || 0) === mid);
+        if (!a) continue;
+
+        const date = String(a.date || '');
+        const field = String(a.field_code || '');
+        const si = Number(a.slot_index || 0);
+        if (!date || !field || !si) continue;
+
+        const td = document.querySelector(
+          `td[data-date="${CSS.escape(date)}"][data-field="${CSS.escape(field)}"][data-slot-index="${si}"]`
+        );
+        if (td && !td.classList.contains('lc-issue-td')){
+          td.classList.add('lc-issue-td');
+          td.classList.remove('lc-touch-td');
+          manualIssueKeys.add(_cellKey(date, field, si));
+          marked++;
+        } else if (td){
+          // даже если уже красная — убедимся, что ключ сохранён
+          manualIssueKeys.add(_cellKey(date, field, si));
+        }
+      }
+    }
+
+    return marked;
+  }
+
+  async function revalidateAllAssignments({ concurrency = 5, silent = true } = {}){
+    if (!window.lastJson || !Array.isArray(lastJson.assignments)) return 0;
+
+    // Полный пересчёт “истины” по нарушениям: сбросим, потом заново отметим.
+    clearIssueHighlights();
+
+    const list = lastJson.assignments
+      .map(a => ({
+        match_id: Number(a.match_id || 0),
+        date: a.date,
+        field_code: a.field_code,
+        slot_index: Number(a.slot_index || 0),
+        slot_no: Number(a.slot_no || 0),
+      }))
+      .filter(a => a.match_id && a.date && a.field_code && a.slot_index);
+
+    let idx = 0;
+    let totalMarked = 0;
+
+    const worker = async () => {
+      while (idx < list.length){
+        const a = list[idx++];
+        const to = _cellFromAssignment(a);
+        const assignNoSelf = cloneAssignmentsFilteredOut([a.match_id]);
+        const r = await movePreview({ match_id: a.match_id, to }, assignNoSelf);
+        totalMarked += markIssuesFromPreview(r);
+      }
+    };
+
+    const workers = [];
+    for (let k = 0; k < Math.max(1, concurrency); k++) workers.push(worker());
+    await Promise.all(workers);
+
+    // не спамим — по умолчанию тихо
+    if (!silent) notify(`Проверка нарушений: подсвечено слотов: ${totalMarked}`, 'primary', 2500);
+
+    return totalMarked;
+  }
+
+  // ---------------------------------------------------------------------------
+  // Constraint highlights (DOM marks after render)
+  // ---------------------------------------------------------------------------
+  function findDayBlockForAssignment(j, a){
+    const date = String(a?.date || '');
+    const start = String(a?.day_start || a?.start || '');
+    const end = String(a?.day_end || a?.end || '');
+    if (!date) return null;
+    const days = Array.isArray(j?.days) ? j.days : [];
+    let day = days.find(d => d && String(d.date||'')===date && String(d.start||'')===start && String(d.end||'')===end);
+    if (!day) day = days.find(d => d && String(d.date||'')===date);
+    return { day };
+  }
+
+  function getGlobalSlotNoFromAssignment(j, a){
+    const date = String(a?.date || '');
+    const slotIndexDirect = Number(a?.slot_index || 0);
+    if (slotIndexDirect) return slotIndexDirect;
+    const localNo = Number(a?.slot_no || 0);
+    if (!date || !localNo) return localNo;
+
+    if (!getGlobalSlotNoFromAssignment._cache) getGlobalSlotNoFromAssignment._cache = {};
+    const cache = getGlobalSlotNoFromAssignment._cache;
+
+    if (!cache[date]){
+      const uniq = new Set();
+      const days = Array.isArray(j?.days) ? j.days : [];
+      for (const d of days){
+        if (!d || d.block === 'reserved') continue;
+        if (String(d.date||'') !== date) continue;
+        for (const t of (d.slots || [])) if (t) uniq.add(String(t));
+      }
+      const times = Array.from(uniq).sort((a,b)=>String(a).localeCompare(String(b)));
+      const map = {};
+      for (let i=0;i<times.length;i++) map[times[i]] = i+1;
+      cache[date] = { times, map };
+    }
+
+    let t = String(a?.time || '');
+    if (!t){
+      const found = findDayBlockForAssignment(j, a);
+      if (found?.day?.slots && found.day.slots[localNo-1]) t = String(found.day.slots[localNo-1]);
+    }
+    if (t && cache[date].map[t]) return cache[date].map[t];
+    return localNo;
+  }
+
+  async function applyConstraintHighlights(){
+    document.querySelectorAll('td.is-violation').forEach(td=>{
+      td.classList.remove('is-violation');
+      td.removeAttribute('title');
+    });
+    document.querySelectorAll('.match.is-violation').forEach(m=>m.classList.remove('is-violation'));
+
+    if (!lastJson?.ok) return;
+    const stageId = getStageId();
+    if (!stageId) return;
+
+    if (!consCacheAll || consCacheAll._stageId !== stageId){
+      const r = await loadConstraintsAll(stageId);
+      if (!r.ok) return;
+      consCacheAll = r;
+      consCacheAll._stageId = stageId;
+    }
+
+    const { mapByDate, mapByDayId } = consCacheAll;
+
+    document.querySelectorAll('td[data-mid]').forEach(td=>{
+      const mid = Number(td.dataset.mid || 0);
+      if (!mid) return;
+      const a = findAssignmentByMatchId(lastJson, mid);
+      if (!a) return;
+      const date = String(a.date || '');
+      if (!date) return;
+
+      const slotNo = getGlobalSlotNoFromAssignment(lastJson, a);
+      const dayId = dayIdFromDateOnly(date);
+      const cMap = (mapByDayId[dayId] || mapByDate[date] || null);
+      if (!cMap) return;
+
+      const h = Number(a.home_squad_id || 0);
+      const g = Number(a.away_squad_id || 0);
+      const reasons = [];
+      for (const sid of [h,g]){
+        const c = cMap[sid];
+        if (!c) continue;
+        if (c.block_day) {
+          reasons.push(`команда #${sid}: день полностью запрещён${c.allow_forced_day ? ' (допустимо только принудительно)' : ''}`);
+          continue;
+        }
+        if (c.nb && slotNo < c.nb) reasons.push(`команда #${sid}: не раньше слота ${c.nb}`);
+        if (c.na && slotNo > c.na) reasons.push(`команда #${sid}: не позже слота ${c.na}`);
+      }
+      if (reasons.length){
+        td.classList.add('is-violation');
+        const m = td.querySelector('.match');
+        if (m) m.classList.add('is-violation');
+        td.title = reasons.join('\n');
+      }
+    });
+  }
+
+  // ---------------------------------------------------------------------------
+  // Render (НЕ ТРОГАЕМ логику; только показываем уже собранные данные)
+  // ---------------------------------------------------------------------------
+function buildUnplacedReasonMap(j){
+  const map = new Map();
+  const rows = Array.isArray(j?.unplaced_reasons) ? j.unplaced_reasons : [];
+  for (const r of rows){
+    const id = Number(r?.id || 0);
+    if (!id) continue;
+    map.set(id, r);
+  }
+  return map;
+}
+
+function renderGlobalUnplaced(j){
+  const unplaced = Array.isArray(j?.unplaced) ? j.unplaced.filter(x => x && x.code) : [];
+  if (!unplaced.length) return '';
+
+  const reasonMap = buildUnplacedReasonMap(j);
+
+  const dayDates = [...new Set((j.days || []).map(d => String(d.date || '')).filter(Boolean))];
+
+  const items = unplaced.map(m => {
+    const id = Number(m.id || 0);
+    const rr = reasonMap.get(id);
+
+    const pd = Number(m.preferred_day ?? -1);
+    const prefDate = (pd >= 0 && dayDates[pd]) ? dayDates[pd] : '';
+    const prefDayLabel = prefDate ? `Целевой день: ${prefDate} (день ${pd + 1})` : 'Целевой день: не определён';
+
+    let reasonsHtml = '<span class="muted">Причина не определена</span>';
+    if (rr && Array.isArray(rr.reasons) && rr.reasons.length){
+      reasonsHtml = rr.reasons.map(x => {
+        const title = String(x?.title || x?.code || '');
+        const count = Number(x?.count || 0);
+        return `${esc(title)}${count ? `: ${count}` : ''}`;
+      }).join(' · ');
+    }
+
+    let statsHtml = '';
+    if (rr && rr.stats){
+      const checked = Number(rr.stats.checked_cells || 0);
+      const free = Number(rr.stats.free_cells || 0);
+      const ok = Number(rr.stats.ok_cells || 0);
+      statsHtml = `<div class="uk-text-meta">Проверено клеток: ${checked} · свободных: ${free} · подходящих: ${ok}</div>`;
+    }
+
+    return `
+      <li>
+        <div><b>${esc(m.code)}</b> — ${esc(m.label || m.title || '')}</div>
+        <div class="uk-text-meta">${esc(prefDayLabel)}</div>
+        <div class="uk-text-small">${reasonsHtml}</div>
+        ${statsHtml}
+      </li>
+    `;
+  }).join('');
+
+  return `
+    <div class="uk-alert-warning uk-margin" uk-alert>
+      <a class="uk-alert-close" uk-close></a>
+      <div class="uk-text-bold">Не размещено матчей: ${unplaced.length}</div>
+      <ul class="uk-list uk-list-divider uk-margin-small-top">${items}</ul>
+    </div>
+  `;
+}
+
+  function render(j){
+    const out = $('out');
+    out.innerHTML = '';
+
+    if (!j?.ok){
+      out.innerHTML = `<div class="uk-alert-danger" uk-alert><p>${esc(j?.error || 'ошибка')}</p></div>`;
+      return;
+    }
+
+    const coachConflicts = Array.isArray(j.coach_conflicts) ? j.coach_conflicts : (j.meta?.coach_conflicts || []);
+    if (coachConflicts.length){
+      const alert = document.createElement('div');
+      alert.className = 'uk-alert-warning uk-margin';
+      alert.setAttribute('uk-alert','');
+      const maxShow = 30;
+      const items = coachConflicts.slice(0, maxShow).map(c => {
+        const matches = (c.matches || []).map(m => `${esc(m.code)}<span class="muted">(${esc(m.field_code)})</span>`).join(', ');
+        return `<li><b>${esc(c.date)} ${esc(c.time)}</b> — ${esc(c.coach_name || ('coach#'+c.coach_id))}: ${matches}</li>`;
+      }).join('');
+      alert.innerHTML = `
+        <p><b>Конфликты тренеров:</b> ${esc(coachConflicts.length)} (показано до ${maxShow}).</p>
+        <div class="uk-text-small muted">Если развести невозможно — расписание всё равно строится, но конфликтные матчи подсвечены оранжевым.</div>
+        <ul class="uk-list uk-list-bullet uk-margin-small-top">${items}${coachConflicts.length>maxShow?'<li class="muted">…</li>':''}</ul>
+      `;
+      out.appendChild(alert);
+    }
+
+    const globalUnplacedHtml = renderGlobalUnplaced(j);
+    if (globalUnplacedHtml){
+      const box = document.createElement('div');
+      box.innerHTML = globalUnplacedHtml;
+      out.appendChild(box);
+    }
+
+    const assignments = new Map();
+    const eventSlotMap = new Map();
+    for (const ev of (j.event_slots || [])) {
+      const date = String(ev?.date || '');
+      const slotIndex = Number(ev?.slot_index || ev?.slot_no || 0);
+      if (!date || !slotIndex) continue;
+      eventSlotMap.set(`${date}|${slotIndex}`, ev);
+    }
+    const eventForSlot = (date, slotNo) => eventSlotMap.get(`${date}|${Number(slotNo || 0)}`) || null;
+    const wrapEvent = (ev) => {
+      if (!ev) return '—';
+      const title = esc(ev.title || ev.msg || 'СЛУЖЕБНОЕ СОБЫТИЕ');
+      const from = esc(ev.time_from || '');
+      const to = esc(ev.time_to || '');
+      const type = esc(ev.event_type || 'custom');
+      const time = (from && to) ? `${from}–${to}` : '';
+      return `<div class="lc-stage-event lc-stage-event--${type}"><div class="lc-stage-event-title">${title}</div>${time ? `<div class="lc-stage-event-time">${time}</div>` : ''}</div>`;
+    };
+    for (const a of (j.assignments || [])) {
+      if (!a || !a.date || !a.field_code) continue;
+      // Подстраховка: если time пустой/устаревший — берём его из slot_no.
+      const t = String(a.time || timeBySlot(j, a.date, (a.slot_index || a.slot_no)) || '');
+      if (!t) continue;
+      assignments.set(`${a.date}|${normTime(t)}|${a.field_code}`, a);
+    }
+
+        // -----------------------------------------------------------------------
+    // Manual DnD: need BOTH slot numbers
+    // - slot_local: 1..N inside current window/card
+    // - slot_index: global (1..N) per DATE across all windows (excluding reserved)
+    // Backend conflicts / schedule_items work with slot_index.
+    // -----------------------------------------------------------------------
+
+    // global slot index map: date -> { "HH:MM": slot_index }
+    const globalSlotIndexByDate = (() => {
+      const out = {};
+      const days = Array.isArray(j?.days) ? j.days : [];
+      const byDate = {};
+      for (const d of days){
+        if (!d || d.block === 'reserved') continue;
+        const date = String(d.date || '');
+        if (!date) continue;
+        (byDate[date] = byDate[date] || []).push(d);
+      }
+      for (const date of Object.keys(byDate)){
+        const uniq = new Set();
+        for (const d of byDate[date]){
+          for (const t of (d.slots || [])) if (t) uniq.add(normTime(t));
+        }
+        const times = Array.from(uniq).sort((a,b)=>String(a).localeCompare(String(b)));
+        const map = {};
+        for (let i=0;i<times.length;i++) map[times[i]] = i + 1;
+        out[date] = map;
+      }
+      return out;
+    })();
+
+    function slotIndexFor(date, time){
+      const dd = String(date || '');
+      const tt = normTime(time || '');
+      const map = globalSlotIndexByDate[dd] || null;
+      return map ? Number(map[tt] || 0) : 0;
+    }
+
+    const tdData = (date, time, localSlotNo, field, dayStart, dayEnd) => {
+
+      const si = slotIndexFor(date, time);
+      return ` data-date="${esc(date)}" data-time="${esc(normTime(time))}"` +
+             ` data-slot="${Number(localSlotNo)}"` +
+             ` data-slot-index="${Number(si)}"` +
+             ` data-field="${esc(field)}" data-day-start="${esc(dayStart||'')}" data-day-end="${esc(dayEnd||'')}"`;
+    };
+
+    const wrapMatch = (a, codePrefix='') => {
+      const rawTitle = (a.title || a.label || a.code_view || a.code || '');
+      const label = esc(a.label || a.code_view || a.code || '');
+      const code  = esc(a.code_view || a.code || '');
+      const warn = a.coach_conflict ? ' ⚠' : '';
+      const dragAttr = manualMode ? ` draggable="true" data-mid="${Number(a.match_id)}"` : '';
+      const dragCls  = manualMode ? ' match-draggable' : '';
+      const prefix = codePrefix ? `<span class="muted">${esc(codePrefix)}:</span>` : '';
+
+      // ---- playoff marker (safe + RU) ----
+      const phase = String(a.phase || '');
+      const isPlayoff = (phase === 'playoff');
+      const phaseCls = isPlayoff ? ' match-playoff' : '';
+
+      function humanRoundName(code){
+        const c = String(code || '').toUpperCase().trim();
+
+        if (/^SF(\d+)?$/.test(c)) {
+          const m = c.match(/^SF(\d+)$/);
+          return m ? `Полуфинал (${m[1]})` : 'Полуфинал';
+        }
+        if (c === 'F') return 'Финал';
+        if (c === '3') return 'Матч за 3-е место';
+        if (/^QF(\d+)?$/.test(c)) {
+          const m = c.match(/^QF(\d+)$/);
+          return m ? `Четвертьфинал (${m[1]})` : 'Четвертьфинал';
+        }
+        if (/^T\d+$/.test(c)) return `Стыки №${c.slice(1)}`;
+        if (c === 'R16') return '1/8 финала';
+        if (c === 'R8')  return '1/4 финала';
+        if (c === 'R4')  return '1/2 финала';
+
+        const m = c.match(/-(SF\d+|QF\d+|F|3|T\d+|R16|R8|R4)-/);
+        if (m) return humanRoundName(m[1]);
+
+        return 'Плей-офф';
+      }
+
+      const roundCode = String(
+        a.round_code || a.round || a.mcode || a.code_view || a.label || ''
+      ).trim();
+
+      const matchCode = String(a.code || '').trim();
+
+      let badgeCode = '';
+      if (isPlayoff){
+        if (roundCode) badgeCode = roundCode;
+        else {
+          const m = matchCode.match(/-(SF\d+|QF\d+|F|3|T\d+)-/i);
+          badgeCode = m ? m[1].toUpperCase() : '';
+        }
+      }
+
+      const poBadge = (isPlayoff && (badgeCode || matchCode))
+        ? `<span class="po-badge">${humanRoundName(badgeCode || matchCode)}</span>`
+        : '';
+
+      const coachIds = (a.coach_ids || []).map(x => Number(x || 0)).filter(Boolean);
+      let titleExtra = '';
+      let dotsHtml = '';
+      if (coachIds.length){
+        const c1 = _coachColor(coachIds[0]);
+        const c2 = coachIds.length > 1 ? _coachColor(coachIds[1]) : null;
+        if (c1) dotsHtml += `<span class="coach-dot" style="background:${c1.accent}"></span>`;
+        if (c2) dotsHtml += `<span class="coach-dot" style="background:${c2.accent}"></span>`;
+        const names = coachIds.slice(0,2).map(cid => coachNameById.get(cid) || ('coach#'+cid));
+        titleExtra = ` • Тренер: ${names.join(' / ')}`;
+      }
+      const title = esc(rawTitle + titleExtra);
+      return `<div class="match${dragCls}${phaseCls}"${dragAttr} title="${title}">${poBadge}${dotsHtml}${prefix}<span class="code">${code}${warn}</span>${label && label !== code ? `<div class="small">${label}</div>` : ''}</div>`;
+    };
+
+    for (const d of (j.days || [])){
+      const card = document.createElement('div');
+      card.className = 'uk-card uk-card-default uk-card-body uk-margin';
+      const isReserved = (d.block === 'reserved');
+      if (isReserved) card.classList.add('reserved-card');
+
+      const head = document.createElement('div');
+      head.innerHTML = `
+        <div class="day-title">${esc(d.date)} • ${esc(d.start)}–${esc(d.end)} • полей: ${esc(d.fields)}${isReserved ? ' • <span class="uk-label uk-label-warning">РЕЗЕРВ ПОД ПЛЕЙ-ОФФ</span>' : ''}</div>
+        <div class="uk-text-small muted">шаг слота: ${esc(d.slot_minutes)} мин, последний слот: ${esc(d.last_slot_minutes)} мин • слотов: ${esc(d.slot_count)}</div>
+      `;
+      card.appendChild(head);
+
+      if (isReserved){
+        const msg = document.createElement('div');
+        msg.className = 'uk-text-small muted uk-margin-small-top';
+        msg.textContent = 'В этой фазе сюда ничего не ставим. Эти дни отрезаны под стыки/плей-офф.';
+        card.appendChild(msg);
+        out.appendChild(card);
+        continue;
+      }
+
+      const table = document.createElement('table');
+      table.className = 'uk-table uk-table-divider uk-table-small uk-margin';
+
+      const thead = document.createElement('thead');
+      const hr = document.createElement('tr');
+      hr.innerHTML = `<th style="width:90px">ВРЕМЯ</th>` + (d.cols || []).map(c => `<th class="uk-text-center">${esc(c)}</th>`).join('');
+      thead.appendChild(hr);
+      table.appendChild(thead);
+
+      const tbody = document.createElement('tbody');
+      const slots = (d.slots || []);
+      const slotsOob = (d.slots_oob || []);
+
+      // helper: есть ли в этой строке (date+time) хоть одно назначение
+      const rowHasAnyAssignment = (date, time) => {
+        for (const fc of ['1','2','3','4','12','34']){
+          if (assignments.get(`${date}|${time}|${fc}`)) return true;
+        }
+        return false;
+      };
+
+      // посчитаем OOB-матчи внутри этой карточки (только реальные назначения)
+      const oobMatchIds = new Set();
+
+let oobCount = 0;
+
+      for (let si = 0; si < slots.length; si++){
+        const t = slots[si];
+        const slotNo = si + 1;
+        const isOob = !!slotsOob[si];
+
+        // Пустые OOB-слоты не рендерим вообще (чтобы не было «красного хвоста»)
+        const hasAny = rowHasAnyAssignment(d.date, t);
+        if (isOob && !hasAny) continue;
+
+        if (isOob && hasAny){
+          for (const fc of ['1','2','3','4','12','34']){
+            const a = assignments.get(`${d.date}|${normTime(t)}|${fc}`);
+            if (a?.match_id) oobMatchIds.add(Number(a.match_id));
+          }
+        }
+        const mode = (d.mode || ((d.cols||[]).length===2 ? 'pair' : 'single'));
+        const mixMode = String(j?.meta?.mix_12_34 || '').toUpperCase();
+        const showMix = (mixMode && mixMode !== 'OFF');
+        const slotEvent = eventForSlot(d.date, slotNo);
+
+        const tr = document.createElement('tr');
+        if (slotEvent) tr.classList.add('lc-event-row');
+        if (isOob) tr.classList.add('oob-row');
+        let htmlRow = `<td class="${isOob ? 'time' : 'muted'}">${esc(t)}</td>`;
+
+        for (const c of (d.cols || [])){
+          const a = assignments.get(`${d.date}|${normTime(t)}|${c}`);
+          const data = tdData(d.date, t, slotNo, c, d.start, d.end);
+          if (!a){
+            const slotEvent = eventForSlot(d.date, slotNo);
+            if (slotEvent){
+              htmlRow += `<td class="uk-text-center lc-event-cell"${data} data-mid="0">${wrapEvent(slotEvent)}</td>`;
+            } else {
+              htmlRow += `<td class="uk-text-center ${isOob ? 'empty' : 'muted'}"${data} data-mid="0">—</td>`;
+            }
+            continue;
+          }
+          const cls = `uk-text-center cell${a.coach_conflict ? ' coach-conflict' : ''}`;
+          htmlRow += `<td class="${cls}"${data} data-mid="${Number(a.match_id)}">${wrapMatch(a)}</td>`;
+        }
+        tr.innerHTML = htmlRow;
+        tbody.appendChild(tr);
+
+        if (!showMix) continue;
+
+        const getA = (fc) => assignments.get(`${d.date}|${normTime(t)}|${fc}`);
+        if (mode === 'single'){
+          const a1 = getA('1');
+          const a2 = getA('2');
+          const a3 = getA('3');
+          const a4 = getA('4');
+          const a12 = getA('12');
+          const a34 = getA('34');
+          const half12Busy = !!(a1 || a2 || a12);
+          const half34Busy = !!(a3 || a4 || a34);
+          const shouldShow = !!(a12 || a34 || (half12Busy !== half34Busy) || slotEvent);
+          if (!shouldShow) continue;
+
+          const sub = document.createElement('tr');
+          sub.className = 'subrow';
+
+          const cellPairHalf = (halfCode, pairA, leftA, rightA, leftLabel, rightLabel) => {
+            const data = tdData(d.date, t, slotNo, halfCode, d.start, d.end);
+            if (pairA){
+              const cls = `uk-text-center cell${pairA.coach_conflict ? ' coach-conflict' : ''}`;
+              return `<td colspan="2" class="${cls}"${data} data-mid="${Number(pairA.match_id)}">${wrapMatch(pairA, halfCode)}</td>`;
+            }
+            const busyList = [];
+            if (leftA) busyList.push(`${leftLabel}:${esc(leftA.code_view||leftA.code||'')}`);
+            if (rightA) busyList.push(`${rightLabel}:${esc(rightA.code_view||rightA.code||'')}`);
+            if (busyList.length){
+              const isCoachConflict = !!((leftA && leftA.coach_conflict) || (rightA && rightA.coach_conflict));
+              const cls = `uk-text-center half-busy${isCoachConflict ? ' coach-conflict' : ''}`;
+              return `<td colspan="2" class="${cls}"${data} data-mid="0">занято (${busyList.join(', ')})</td>`;
+            }
+            if (slotEvent){
+              return `<td colspan="2" class="uk-text-center lc-event-cell"${data} data-mid="0">${wrapEvent(slotEvent)}</td>`;
+            }
+            return `<td colspan="2" class="uk-text-center muted half-free"${data} data-mid="0">свободно</td>`;
+          };
+
+          let subHtml = `<td class="muted uk-text-small">↳ 12/34</td>`;
+          subHtml += cellPairHalf('12', a12, a1, a2, '1', '2');
+          subHtml += cellPairHalf('34', a34, a3, a4, '3', '4');
+          sub.innerHTML = subHtml;
+          tbody.appendChild(sub);
+        }
+      }
+
+      table.appendChild(tbody);
+      card.appendChild(table);
+
+      oobCount = oobMatchIds.size;
+
+if (oobCount){
+        const un = document.createElement('div');
+        un.className = 'uk-alert-danger unplaced';
+        un.setAttribute('uk-alert','');
+        un.innerHTML = `<p><b>ВНИМАНИЕ:</b> в этом дне есть <b>${oobCount}</b> матч(ей) <b>вне диапазона дня</b> — подсвечены красным.</p>`;
+        card.appendChild(un);
+      }
+      //card.appendChild(un);
+      out.appendChild(card);
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // Build (manual trigger: "ПОСТРОИТЬ" / auto-load saved)
+  // ---------------------------------------------------------------------------
+  async function build(opts){
+    const stageId = getStageId();
+    if (!stageId){
+      $('status').textContent = 'выбери этап';
+      notify('Выбери этап', 'warning');
+      return;
+    }
+
+    const wantSaved = !!(opts && opts.load_saved);
+    if (wantSaved){
+      await buildSavedFromDb(stageId);
+      return;
+    }
+
+    // обычная генерация (только по кнопке «ПОСТРОИТЬ»)
+    $('status').textContent = 'считаю…';
+    const j = await apiGet(buildUrl({}));
+    lastJson = j;
+    await ensureCoachPalette(stageId);
+
+    if (!j.ok){
+      $('status').textContent = j.error || 'ошибка';
+    } else {
+      $('status').textContent = `готово (матчей: ${j.meta?.matches_total ?? '—'}, размещено: ${j.meta?.placed ?? '—'})`;
+    }
+    clearDropMarks();
+    render(j);
+    await applyConstraintHighlights();
+
+    // сводный нотис (один раз на состояние)
+    noticeOnce(makeNoticeSig(j), () => summarizeIssues(j));
+  }
+
+  // ---------------------------------------------------------------------------
+  // Load saved from DB (schedule_items is truth; schedule_lab used as frame + rich)
+  // ---------------------------------------------------------------------------
+  async function buildSavedFromDb(stageId){
+    stageId = Number(stageId || 0);
+    if (!stageId) return;
+
+    applyUiOpts(stageId);
+    $('status').textContent = 'загружаю сохранённое…';
+
+    // 1) schedule_items — источник истины по размещению
+    const si = await apiGet(`${API_SCHEDULE_ITEMS}?stage_id=${stageId}`);
+    if (!si.ok){
+      $('status').textContent = si.error || 'ошибка schedule_items';
+      return;
+    }
+    const items = Array.isArray(si.items) ? si.items : [];
+    if (!items.length){
+      $('status').textContent = 'нет сохранённого расписания — нажми «ПОСТРОИТЬ»';
+      lastJson = null;
+      $('out').innerHTML = '';
+      return;
+    }
+
+    // 2) каркас (дни/слоты/колонки) — всегда show=teams, чтобы бек не резал поля
+    const frame = await apiGet(buildUrl({ force_all: 1, show: 'teams' }));
+    if (!frame.ok){
+      $('status').textContent = frame.error || 'ошибка schedule_lab';
+      return;
+    }
+
+    // 3) rich-слой: schedule_lab load_saved=1 (для label/title/coach_ids/…)
+    const rich = await apiGet(buildUrl({ load_saved: 1, force_all: 1, show: 'teams' }));
+
+    const richById = new Map();
+    if (rich && rich.ok && Array.isArray(rich.assignments)){
+      for (const a of rich.assignments){
+        const mid = Number(a.match_id || a.id || 0);
+        if (mid) richById.set(mid, a);
+      }
+    }
+
+    // fallback: если rich.assignments не содержит нужного — пробуем frame.matches (если есть)
+    const matchesById = new Map();
+    for (const m of (frame.matches || [])){
+      const id = Number(m?.id || m?.match_id || 0);
+      if (id) matchesById.set(id, m);
+    }
+
+    // 4) day_date + slot_index -> {time, slot_no внутри блока}
+    const daysByDate = {};
+    for (const d of (frame.days || [])){
+      const date = String(d.date || '');
+      if (!date) continue;
+      (daysByDate[date] = daysByDate[date] || []).push(d);
+    }
+
+    const daySlot = {};
+    for (const date of Object.keys(daysByDate)){
+      const blocks = daysByDate[date].slice().sort((a,b)=>{
+        const as = String(a.start || '');
+        const bs = String(b.start || '');
+        return as.localeCompare(bs);
+      });
+
+      const byIndex = {};
+      let idx = 1;
+
+      for (const b of blocks){
+        const slots = Array.isArray(b.slots) ? b.slots : [];
+        for (let i = 0; i < slots.length; i++){
+          const t = String(slots[i] || '');
+          if (!t){ idx++; continue; }
+          byIndex[idx] = { time: t, slot_no: (i + 1) };
+          idx++;
+        }
+      }
+      daySlot[date] = byIndex;
+    }
+
+    // helper: привести матч к тому, что ждёт render()
+    function normalizeMatchForRender(mid, base){
+      const m = base || { id: mid, match_id: mid };
+
+      const code = m.code_view || m.code || m.match_code || (`#${mid}`);
+      const title =
+        m.title ||
+        m.label ||
+        m.match_title ||
+        (m.home_title && m.away_title ? `${m.home_title} — ${m.away_title}` : '') ||
+        (m.s1_title && m.s2_title ? `${m.s1_title} — ${m.s2_title}` : '') ||
+        '';
+
+      return {
+        ...m,
+        id: Number(m.id || mid),
+        match_id: Number(m.match_id || mid),
+        code: code,
+        label: m.label || title || code,
+        title: m.title || title || code
+      };
+    }
+
+    // 5) schedule_items -> assignments (обогащаем rich-данными)
+    const assigns = [];
+    const assigned = new Set();
+
+    for (const it of items){
+      const mid = Number(it.match_id || 0);
+      const date = String(it.day_date || '');
+      const slotIndex = Number(it.slot_index || 0);
+      const field = String(it.resource_code || '');
+      if (!mid || !date || !slotIndex || !field) continue;
+
+      const map = daySlot[date] || null;
+      const pos = map ? map[slotIndex] : null;
+      if (!pos || !pos.time) continue;
+
+      const base = richById.get(mid) || matchesById.get(mid) || null;
+      const nm = normalizeMatchForRender(mid, base);
+
+      assigns.push({
+        ...nm,
+        date,
+        time: pos.time,
+        slot_index: slotIndex,   // global from schedule_items
+        slot_no: pos.slot_no,    // local for this window
+        field_code: field
+      });
+
+      assigned.add(mid);
+    }
+
+    // 6) unplaced — предупреждения (если frame.matches есть)
+    const unplaced = [];
+    for (const m of (frame.matches || [])){
+      const mid = Number(m.id || 0);
+      if (!mid || assigned.has(mid)) continue;
+      unplaced.push({ match_id: mid, code: (m.code_view || m.code || ('#' + mid)) });
+    }
+
+    frame.assignments = assigns;
+    frame.unplaced = unplaced;
+    frame.meta = frame.meta || {};
+    frame.meta.placed = assigns.length;
+    frame.meta.saved = 1;
+
+    lastJson = frame;
+    window.lastJson = frame; // удобно для дебага (можно убрать)
+
+    await ensureCoachPalette(stageId);
+
+    $('status').textContent = `загружено из БД (назначений: ${assigns.length})`;
+    clearDropMarks();
+    render(frame);
+    await applyConstraintHighlights();
+    await revalidateAllAssignments({ concurrency: 5, silent: true });
+    reapplyManualHighlights();
+
+    // сводный нотис (один раз на состояние)
+    noticeOnce(makeNoticeSig(frame), () => summarizeIssues(frame));
+  }
+
+  // ---------------------------------------------------------------------------
+  // Copy / Save
+  // ---------------------------------------------------------------------------
+  async function copyJson(){
+    if (!lastJson){ notify('Сначала нажми «ПОСТРОИТЬ».', 'warning'); return; }
+    try{
+      await navigator.clipboard.writeText(JSON.stringify(lastJson, null, 2));
+      notify('JSON скопирован.', 'success');
+    }catch(e){
+      notify('Не смог скопировать (браузер запретил).', 'danger');
+    }
+  }
+
+  async function saveToDb(){
+    const stageId = getStageId();
+    if (!stageId){ notify('Выбери этап', 'warning'); return; }
+    if (!lastJson || !lastJson.ok){ notify('Сначала нажми «ПОСТРОИТЬ».', 'warning'); return; }
+
+    const assigns = (lastJson.assignments || [])
+      .filter(a => a && Number(a.match_id || 0) > 0)
+      .map(a => {
+        const si = Number(a.slot_index || 0);
+        return {
+          ...a,
+          slot_index: si || undefined,
+          // ВАЖНО: текущий API может читать slot_no как slot_index — подменяем при сохранении
+          slot_no: si || Number(a.slot_no || 0),
+        };
+      });
+    if (!assigns.length){ notify('Нет назначений для сохранения.', 'warning'); return; }
+
+    const btn = $('btn_save');
+    if (btn) btn.disabled = true;
+    try{
+      // фиксируем выбранные режимы (в т.ч. HARD) для восстановления после reload
+      saveUiOpts(stageId);
+
+      const res = await apiPostJson(API_SCHEDULE_SAVE, { stage_id: stageId, assignments: assigns });
+      if (!res.ok) throw new Error(res.error || 'save failed');
+
+      notify('Сохранено: ' + (res.saved || 0) + ' назначений', 'success');
+
+      // сразу подтягиваем сохранённое из БД, чтобы UI показал ровно то, что записано
+      await build({load_saved:1});
+    }catch(e){
+      console.error(e);
+      notify('Ошибка сохранения: ' + (e.message || e), 'danger');
+    }finally{
+      if (btn) btn.disabled = false;
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // Stages loader
+  // ---------------------------------------------------------------------------
+  async function loadStages(){
+    $('status').textContent = 'загружаю этапы…';
+    const cur = await apiGet(API_CURRENT);
+    const currentStageId = cur?.stage?.id ? Number(cur.stage.id) : 0;
+
+    const j = await apiGet(API_STAGES);
+    if (!j.ok){ $('status').textContent = j.error || 'ошибка'; return; }
+
+    const sel = $('stage_id');
+    sel.innerHTML = '';
+    for (const s of (j.stages || [])){
+      const opt = document.createElement('option');
+      opt.value = s.id;
+      opt.textContent = `${s.name || ('Этап #' + s.id)} (id=${s.id})`;
+      sel.appendChild(opt);
+    }
+
+    if (currentStageId) sel.value = String(currentStageId);
+    $('status').textContent = 'готово';
+  }
+
+  // ---------------------------------------------------------------------------
+  // UI binds (buttons + manual drag/swap)
+  // ---------------------------------------------------------------------------
+
+function cellTimeForDrop(td){
+  if (!td) return '';
+  // обычная строка: время слева
+  const tRow = normTime(cellTimeFromTd(td) || '');
+  if (tRow) return tRow;
+
+  // подстроки типа "↳ 12/34": там время в data-time
+  const tData = normTime(td.dataset.time || '');
+  if (tData) return tData;
+
+  return '';
+}
+
+  function _dropCellFromPoint(x, y){
+    if (!Number.isFinite(x) || !Number.isFinite(y)) return null;
+    // elementsFromPoint даёт стек перекрытий (сверху вниз) — берём первую подходящую td
+    const stack = (document.elementsFromPoint ? document.elementsFromPoint(x, y) : [document.elementFromPoint(x, y)]);
+    for (const el of (stack || [])){
+      if (!el || el.nodeType !== 1) continue;
+      if (el.matches && el.matches('td[data-date][data-slot-index][data-field]')) return el;
+      const td = el.closest ? el.closest('td[data-date][data-slot-index][data-field]') : null;
+      if (td) return td;
+    }
+    return null;
+  }
+
+  function _dropCellFromEvent(e){
+    // 1) пробуем по координатам (самое стабильное при оверлеях/карточках)
+    const td0 = _dropCellFromPoint(e.clientX, e.clientY);
+    if (td0) return td0;
+
+    // 2) fallback: composedPath
+    try{
+      const path = (typeof e.composedPath === 'function') ? e.composedPath() : [];
+      for (const el of path){
+        if (el && el.nodeType === 1 && el.matches && el.matches('td[data-date][data-slot-index][data-field]')) return el;
+      }
+    }catch(_){/* ignore */}
+
+    // 3) fallback: target.closest
+    const td1 = e.target?.closest ? e.target.closest('td[data-date][data-slot-index][data-field]') : null;
+    if (td1) return td1;
+    return null;
+  }
+
+  function bindUI(){
+    //$('btn_build')?.addEventListener('click', (e)=>{ e.preventDefault(); saveUiOpts(getStageId()); build({load_saved:0}); });
+    $('btn_build')?.addEventListener('click', (e)=>{
+      e.preventDefault();
+      // ВАЖНО: не сохраняем UI-опции при построении, иначе они перетрут "режим последнего SAVE"
+      build({load_saved:0});
+    });
+    $('btn_copy')?.addEventListener('click', (e)=>{ e.preventDefault(); copyJson(); });
+    $('btn_save')?.addEventListener('click', (e)=>{ e.preventDefault(); saveToDb(); });
+
+    $('stage_id')?.addEventListener('change', ()=>{
+      if (window.LC_DaysEditor) window.LC_DaysEditor.load(getStageId()).catch(()=>{});
+      if (window.LC_StageEventsEditor) window.LC_StageEventsEditor.load(getStageId()).catch(()=>{});
+      build({load_saved:1});
+    });
+    $('btnConstraints')?.addEventListener('click', (e)=>{ e.preventDefault(); constraintsOpenModal(); });
+    $('cSave')?.addEventListener('click', (e)=>{ e.preventDefault(); constraintsSave(); });
+    $('cDay')?.addEventListener('change', async ()=>{
+      rebuildSlotSelects();
+      await constraintsRefreshList();
+    });
+    $('cBlockDay')?.addEventListener('change', ()=>{
+      constraintsSyncModeUI();
+    });
+    $('cAllowForcedDay')?.addEventListener('change', ()=>{
+      constraintsSyncModeUI();
+    });
+    $('cShowAllDays')?.addEventListener('change', async ()=>{
+      await constraintsRefreshList();
+    });
+
+    $('manual_mode')?.addEventListener('change', (e)=>{
+      manualMode = !!e.target.checked;
+      dragMatchId = 0;
+      lastDropCell = null;
+      clearDropMarks();
+      if (lastJson?.ok) render(lastJson);
+    });
+
+    // source cell snapshot (critical: render/keys use date|time|field)
+    let dragFromCell = null;
+
+    // drag start
+    $('out')?.addEventListener('dragstart', (e)=>{
+      const el = e.target.closest('.match-draggable');
+      if (!manualMode || !el) return;
+      dragMatchId = Number(el.dataset.mid || 0);
+      if (!dragMatchId) return;
+
+      // фиксируем ИМЕННО TD-ячейку источника (а не assignment.time),
+      // иначе при reserved-строках время может не совпасть и матч "пропадёт".
+      const td = el.closest('td[data-date][data-slot-index][data-field]');
+      if (td){
+        dragFromCell = {
+          date: td.dataset.date,
+          slot_local: Number(td.dataset.slot || 0),
+          slot_index: Number(td.dataset.slotIndex || 0),
+          field_code: td.dataset.field,
+          time: normTime(cellTimeFromTd(td) || td.dataset.time || ''),
+          day_start: td.dataset.dayStart || '',
+          day_end: td.dataset.dayEnd || ''
+        };
+      } else {
+        dragFromCell = null;
+      }
+
+      el.classList.add('is-dragging');
+      e.dataTransfer.effectAllowed = 'move';
+      try{ e.dataTransfer.setData('text/plain', String(dragMatchId)); }catch(_e){}
+    });
+
+    // drag end (в т.ч. отмена)
+    $('out')?.addEventListener('dragend', ()=>{
+      console.log('DRAGEND', { manualMode, dragMatchId, lastDropCell });
+      document.querySelectorAll('.match-draggable.is-dragging').forEach(x=>x.classList.remove('is-dragging'));
+
+ if (dropInProgress) return; // ✅ важное
+
+      dragMatchId = 0;
+      dragFromCell = null;
+      lastDropCell = null;
+      clearDropMarks();
+    });
+
+    // drag over (preview)
+    $('out')?.addEventListener('dragover', (e)=>{
+      if (!manualMode || !dragMatchId || !lastJson?.ok) return;
+      e.preventDefault();
+      e.stopPropagation();
+      //const td = lastDropCell || _dropCellFromEvent(e);
+      const td = _dropCellFromEvent(e);
+      if (!td) return;
+      e.dataTransfer.dropEffect = 'move';
+      if (lastDropCell === td) return;
+      lastDropCell = td;
+
+      const to = { date: td.dataset.date, slot_index: Number(td.dataset.slotIndex || 0), slot_local: Number(td.dataset.slot || 0), slot_no: Number(td.dataset.slotIndex || 0), field_code: td.dataset.field, time: cellTimeForDrop(td), day_start: td.dataset.dayStart || '', day_end: td.dataset.dayEnd || '' };
+      debounce(async ()=>{
+        clearDropMarks();
+        const targetMid = Number(td.dataset.mid || 0);
+        const r = await movePreview({ match_id: dragMatchId, to });
+        if (r?.ok){
+          clearManualIssues();
+          td.classList.add('drop-ok');
+          td.title = targetMid ? 'Можно (swap возможен)' : 'Можно поставить';
+        } else {
+          td.classList.add('drop-bad');
+          const msg = (r?.reasons || []).map(x => x.msg || x.code).join('; ') || (r?.error || 'Нельзя');
+          td.title = msg;
+
+          // ✅ панель + подсветка уже на preview
+          showManualIssues('Нельзя поставить', r, [dragMatchId, Number(td.dataset.mid || 0)]);
+        }
+      }, 180);
+    }, { capture: true });
+
+    // drop (apply)
+$('out')?.addEventListener('drop', async (e)=>{
+  if (!manualMode || !dragMatchId || !lastJson?.ok) return;
+  e.preventDefault();
+  e.stopPropagation();
+
+  dropInProgress = true;
+  const midDrag = dragMatchId;
+  const fromCellSnap = dragFromCell ? {...dragFromCell} : null;
+
+  try {
+    const td = lastDropCell || _dropCellFromEvent(e);
+    if (!td) return;
+
+    const to = {
+      date: td.dataset.date,
+      slot_index: Number(td.dataset.slotIndex || 0),
+      slot_local: Number(td.dataset.slot || 0),
+      slot_no: Number(td.dataset.slotIndex || 0), // for backend (current API)
+      field_code: td.dataset.field,
+      time: cellTimeForDrop(td),
+      day_start: td.dataset.dayStart || '',
+      day_end: td.dataset.dayEnd || ''
+    };
+
+    const srcA = findAssignmentByMatchId(lastJson, midDrag);
+    if (!srcA){ notify('Не нашёл исходный assignment', 'warning'); return; }
+
+    const from = fromCellSnap ? {
+      date: String(fromCellSnap.date),
+      slot_index: Number(fromCellSnap.slot_index || 0),
+      slot_local: Number(fromCellSnap.slot_local || 0),
+      slot_no: Number(fromCellSnap.slot_index || 0), // for backend (current API)
+      field_code: String(fromCellSnap.field_code),
+      time: normTime(String(fromCellSnap.time || '')),
+      day_start: String(fromCellSnap.day_start || ''),
+      day_end: String(fromCellSnap.day_end || '')
+    } : {
+      date: String(srcA.date),
+      slot_index: Number(srcA.slot_index || srcA.slot_no || 0),
+      slot_local: Number(srcA.slot_no || 0),
+      slot_no: Number(srcA.slot_index || srcA.slot_no || 0), // for backend (current API)
+      field_code: String(srcA.field_code),
+      time: normTime(String(srcA.time || timeBySlot(lastJson, srcA.date, (srcA.slot_index || srcA.slot_no)) || '')),
+      day_start: String(srcA.day_start || ''),
+      day_end: String(srcA.day_end || '')
+    };
+
+    const targetMid = Number(td.dataset.mid || 0);
+
+    // move
+    if (!targetMid){
+      const r = await movePreview({ match_id: midDrag, to });
+      if (!r?.ok && hasReservedReason(r)) {
+        showManualIssues('Слот зарезервирован', r, [midDrag]);
+        return;
+      }
+      if (!r?.ok){
+        showManualIssues('Перенос запрещён правилами', r, [midDrag]);
+      } else {
+        clearManualIssues();
+      }
+      applyMoveLocally(midDrag, to);
+      render(lastJson);
+      await applyConstraintHighlights();
+
+      reapplyManualHighlights();
+
+      highlightIssueSlotsFromReasons(r, to, from);
+
+      if (r?.ok) notify('Перенесено.', 'success');
+      noticeOnce(makeNoticeSig(lastJson), () => summarizeIssues(lastJson));
+      return;
+    }
+
+     // swap
+     if (targetMid === midDrag) return;
+
+     if (!confirm(`Ячейка занята. Сделать SWAP?\n${midDrag} ⇄ ${targetMid}`)) return;
+
+     const assignNoTarget = cloneAssignmentsFilteredOut([targetMid]);
+     const r1 = await movePreview({ match_id: midDrag, to }, assignNoTarget);
+
+     const assignNoDrag = cloneAssignmentsFilteredOut([midDrag]);
+     const r2 = await movePreview({ match_id: targetMid, to: from }, assignNoDrag);
+
+     // соберём merged сразу (и для алерта, и для подсветки)
+     const merged = { ok: !!(r1?.ok && r2?.ok), reasons: [] };
+     if (r1?.reasons) merged.reasons = merged.reasons.concat(r1.reasons);
+     if (r2?.reasons) merged.reasons = merged.reasons.concat(r2.reasons);
+     merged.error = r1?.error || r2?.error || '';
+
+     if (hasReservedReason(merged)) {
+       showManualIssues('Слот зарезервирован', merged);
+       return;
+     }
+
+     // ✅ apply with fixed ids
+     if (!applySwapLocally(midDrag, targetMid, to, from)){
+       notify('Локальный SWAP не применился (assignment не найден).', 'danger', 8000);
+       return;
+     }
+
+     render(lastJson);
+     await applyConstraintHighlights();
+     await revalidateAllAssignments({ concurrency: 5, silent: true });
+
+     reapplyManualHighlights();
+
+
+     // ✅ ВОТ СЮДА: после перерисовки
+     //highlightIssueSlotsFromReasons(merged, to, from);
+     highlightIssueSlotsFromReasons(merged, to, from, midDrag, targetMid);
+
+     // алерт/очистка — после, чтобы не сбить подсветку
+     if (!merged.ok){
+       showManualIssues('SWAP с нарушениями', merged);
+     } else {
+       clearManualIssues(); // он НЕ должен чистить td-подсветку, только текст/матчи
+       clearSlotHighlights();
+     }
+
+        if (r1?.ok && r2?.ok) notify('SWAP выполнен.', 'success');
+        noticeOnce(makeNoticeSig(lastJson), () => summarizeIssues(lastJson));
+      } finally {
+        // единый сброс после завершения drop
+        dropInProgress = false;
+        dragMatchId = 0;
+        dragFromCell = null;
+        lastDropCell = null;
+        clearDropMarks();
+      }
+    }, { capture: true });
+  }
+
+  // ---------------------------------------------------------------------------
+  // Boot
+  // ---------------------------------------------------------------------------
+  function boot(){
+    loadStages().then(async ()=>{
+      bindUI();
+      // автоподтягивание дней этапа
+      if (window.LC_DaysEditor) await window.LC_DaysEditor.load(getStageId()).catch(()=>{});
+      if (window.LC_StageEventsEditor) await window.LC_StageEventsEditor.load(getStageId()).catch(()=>{});
+      // автоподтягивание сохранённого расписания (если есть) сразу после открытия страницы
+      await build({load_saved:1});
+    }).catch(err=>{
+      console.error(err);
+      $('status').textContent = 'ошибка загрузки';
+    });
+  }
+
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);
+  else boot();
+
+})();
+
+//------------------------------
+// DEBUG COACH_CONFLICT
+//------------------------------
+function calcCoachGaps(){
+  const A = window.lastJson?.assignments || [];
+  const placed = A.filter(a => a?.date && a?.slot_index && a?.field_code);
+  const map = new Map(); // date|coach -> [slot_index]
+  for (const a of placed){
+    const date = String(a.date);
+    const si = Number(a.slot_index||0);
+    for (const cid of (a.coach_ids||[])){
+      const coach = Number(cid||0);
+      if (!coach) continue;
+      const k = date+'|'+coach;
+      if (!map.has(k)) map.set(k, []);
+      map.get(k).push(si);
+    }
+  }
+  let totalGaps = 0;
+  const rows = [];
+  for (const [k, arr] of map.entries()){
+    if (arr.length < 2) continue;
+    arr.sort((a,b)=>a-b);
+    let gaps = 0;
+    for (let i=1;i<arr.length;i++){
+      const d = arr[i]-arr[i-1];
+      if (d>1) gaps += (d-1);
+    }
+    totalGaps += gaps;
+    rows.push({ key:k, games: arr.length, gaps, chain: arr.join(',') });
+  }
+  rows.sort((a,b)=>b.gaps-a.gaps);
+  console.log('TOTAL coach gaps =', totalGaps);
+  console.table(rows.slice(0, 15));
+  return { totalGaps, rows };
+}
+
+function debugCoachGapsFromMap(){
+  const A = (window.lastJson && Array.isArray(lastJson.assignments)) ? lastJson.assignments : [];
+  const M = (window.lastJson && lastJson.match_coach_map) ? lastJson.match_coach_map : null;
+  const N = (window.lastJson && lastJson.coach_name_map) ? lastJson.coach_name_map : {};
+
+  if (!A.length){ console.warn('assignments пуст'); return []; }
+  if (!M){ console.warn('нет lastJson.match_coach_map (не добавили в schedule_lab.php)'); return []; }
+
+  const byDateCoach = new Map();
+
+  for (const a of A){
+    const mid = String(a.match_id || '');
+    if (!mid) continue;
+
+    const coachIds = Array.isArray(M[mid]) ? M[mid] : [];
+    if (!coachIds.length) continue;
+
+    const date = String(a.date || '');
+    const si = Number(a.slot_index || a.slot_no || 0);
+    if (!date || !si) continue;
+
+    for (const cid of coachIds){
+      const coachId = Number(cid||0);
+      if (!coachId) continue;
+
+      if (!byDateCoach.has(date)) byDateCoach.set(date, new Map());
+      const cm = byDateCoach.get(date);
+      if (!cm.has(coachId)) cm.set(coachId, []);
+      cm.get(coachId).push({ slot_index: si, match_id: Number(mid), field: a.field_code });
+    }
+  }
+
+  const report = [];
+  for (const [date, cm] of byDateCoach.entries()){
+    for (const [coachId, arr] of cm.entries()){
+      if (arr.length < 2) continue;
+      arr.sort((x,y)=>x.slot_index-y.slot_index);
+
+      let gaps = 0;
+      const holes = [];
+      for (let i=1;i<arr.length;i++){
+        const d = arr[i].slot_index - arr[i-1].slot_index;
+        if (d > 1){
+          gaps += (d - 1);
+          holes.push({ from: arr[i-1], to: arr[i], gap: d-1 });
+        }
+      }
+
+      report.push({
+        date,
+        coachId,
+        coachName: N[String(coachId)] || ('coach#'+coachId),
+        games: arr.length,
+        gaps,
+        chain: arr.map(x => `#${x.match_id}@${x.slot_index}[${x.field}]`).join(' → '),
+        holes
+      });
+    }
+  }
+
+  report.sort((a,b)=> (b.gaps-a.gaps) || (b.games-a.games));
+  console.table(report.map(r => ({
+    date: r.date,
+    coach: `${r.coachName} (${r.coachId})`,
+    games: r.games,
+    gaps: r.gaps,
+    chain: r.chain
+  })));
+  return report;
+}
+  </script>
+</body>
+</html>
